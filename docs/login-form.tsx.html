@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: login-form.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: login-form.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use client'
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { signIn } from "next-auth/react"
+import Image from "next/image"
+
+/**
+ * A login form component which renders a centered card with a Google sign in button.
+ * 
+ * This component uses the {@link https://next-auth.js.org/ `next-auth`} library to handle the authentication flow.
+ * 
+ * @returns A JSX element representing the login form.
+ */
+export function LoginForm() {
+
+  /**
+   * Handles the Google login process.
+   * 
+   * This function uses the {@link https://next-auth.js.org/ `next-auth`} library to handle the authentication flow.
+   * When the user clicks the Google sign in button, this function is called and it redirects the user to the Google
+   * authentication page. Once the user has authenticated, they are redirected back to this page with an authorization
+   * token which is then used to authenticate the user with the server.
+   * 
+   * If there is an error during the authentication flow, the error is logged to the console.
+   */
+  const handleGoogleLogin = async () => {
+    try {
+      await signIn('google', { 
+        callbackUrl: '/select',
+        redirect: true,
+      })
+    } catch (error) {
+      console.error('Login error:', error)
+    }
+  }
+
+  return (
+    &lt;div className="flex items-center justify-center min-h-screen bg-background">
+      &lt;Card className="w-[350px]">
+        &lt;CardHeader className="text-center">
+          &lt;CardTitle>Welcome to Team 32(1) POS&lt;/CardTitle>
+          &lt;CardDescription>Sign in to access your account&lt;/CardDescription>
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;div className="flex justify-center mb-4">
+            &lt;Image src="https://i.imgur.com/fYf1GtG.png" alt="Panda Express Logo" width={100} height={100}/>
+          &lt;/div>
+          &lt;Button 
+            className="w-full" 
+            onClick={handleGoogleLogin}
+          >
+            &lt;svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+              &lt;path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z">&lt;/path>
+            &lt;/svg>
+            Sign in with Google
+          &lt;/Button>
+        &lt;/CardContent>
+      &lt;/Card>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

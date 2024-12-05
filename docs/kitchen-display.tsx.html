@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: kitchen-display.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: kitchen-display.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { AlertTriangle, CheckCircle, Clock, XCircle, Loader } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { LogoutButton } from "@/components/ui/logout-button"
+
+/**
+ * @typedef {'new' | 'in-progress' | 'overdue' | 'completed' | 'cancelled'} OrderStatus 
+*/
+type OrderStatus = 'new' | 'in-progress' | 'overdue' | 'completed' | 'cancelled'
+
+/**
+ * @typedef Order
+ * @property {string} id
+ * @property {string} dateTime
+ * @property {OrderStatus} status
+ * @property {string[]} items
+ */
+interface Order {
+  id: string
+  dateTime: string
+  status: OrderStatus
+  items: string[]
+}
+
+/**
+ * The StatusIcon component displays an icon based on the order status.
+ * @param {OrderStatus} status The status of the order.
+ */
+const statusColors: Record&lt;OrderStatus, string> = {
+  'new': 'bg-green-500',
+  'in-progress': 'bg-orange-500',
+  'overdue': 'bg-red-500',
+  'completed': 'bg-gray-500',
+  'cancelled': 'bg-gray-500'
+}
+
+/**
+ * Renders an icon representing the current status of an order.
+ * 
+ * @param {Object} props - The properties object.
+ * @param {OrderStatus} props.status - The status of the order.
+ * 
+ * @returns {JSX.Element | null} A JSX element containing the icon for the given status, or null if the status is not recognized.
+ */
+const StatusIcon = ({ status }: { status: OrderStatus }) => {
+  switch (status) {
+    case 'in-progress':
+      return &lt;Clock className="h-6 w-6 text-white" />
+    case 'overdue':
+      return &lt;AlertTriangle className="h-6 w-6 text-white" />
+    case 'completed':
+      return &lt;CheckCircle className="h-6 w-6 text-white" />
+    default:
+      return null
+  }
+}
+
+/**
+ * Renders an order card component that displays the details of an order,
+ * including its status and items. Allows for order completion and cancellation.
+ * 
+ * @param {Object} props - The component props.
+ * @param {Order} props.order - The order object containing details of the order.
+ * @param {function} props.onStatusChange - Callback function to handle status changes, accepts order ID and new status.
+ * @param {function} props.onCancel - Callback function to handle order cancellation, accepts order ID.
+ * @param {boolean} props.isProcessing - Flag indicating if an order action is currently being processed.
+ * 
+ * @returns {JSX.Element} The JSX element representing the order card.
+ */
+const OrderCard = ({ order, onStatusChange, onCancel, isProcessing }: { 
+  order: Order; 
+  onStatusChange: (id: string, status: OrderStatus) => Promise&lt;void>;
+  onCancel: (id: string) => Promise&lt;void>;
+  isProcessing: boolean;
+}) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isCompletingOrder, setIsCompletingOrder] = useState(false)
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false)
+
+  /**
+   * Handles the completion of an order by calling the onStatusChange callback
+   * with the order ID and the new status 'completed'.
+   * 
+   * @async
+   * @function
+   * @name handleComplete
+   * @returns {Promise&lt;void>} A promise that resolves when the status change has been completed.
+   */
+  const handleComplete = async () => {
+    if (isCompletingOrder || isProcessing) return
+    setIsCompletingOrder(true)
+    await onStatusChange(order.id, 'completed')
+    setIsCompletingOrder(false)
+  }
+
+/**
+ * Initiates the cancellation process for an order by opening a confirmation dialog.
+ * 
+ * Prevents the action if an order cancellation or any processing is already in progress.
+ * 
+ * @function
+ * @name handleCancel
+ * @returns {void}
+ */
+  const handleCancel = () => {
+    if (isCancellingOrder || isProcessing) return
+    setIsDialogOpen(true)
+  }
+
+  /**
+   * Confirms the cancellation of an order by calling the onCancel callback
+   * with the order ID, and sets the isCancellingOrder state to true until
+   * the cancellation is complete.
+   * 
+   * @async
+   * @function
+   * @name confirmCancel
+   * @returns {Promise&lt;void>} A promise that resolves when the cancellation has been completed.
+   */
+  const confirmCancel = async () => {
+    setIsDialogOpen(false)
+    setIsCancellingOrder(true)
+    await onCancel(order.id)
+    setIsCancellingOrder(false)
+  }
+
+  return (
+    &lt;>
+      &lt;div className={`bg-white rounded-lg shadow-md overflow-hidden transition-opacity duration-500 ${order.status === 'completed' || order.status === 'cancelled' ? 'opacity-0' : 'opacity-100'}`}>
+        &lt;div className={`p-4 ${statusColors[order.status]} flex justify-between items-center`}>
+          &lt;div>
+            &lt;h3 className="font-bold text-white">#{String(order.id).slice(-3).padStart(3, '0')}&lt;/h3>
+            &lt;p className="text-sm text-white">{new Date(order.dateTime).toLocaleString()}&lt;/p>
+          &lt;/div>
+          &lt;StatusIcon status={order.status} />
+        &lt;/div>
+        &lt;div className="p-4">
+          &lt;ul className="space-y-2">
+            {order.items.map((item, index) => (
+              &lt;li key={index} className="text-gray-700">{item}&lt;/li>
+            ))}
+          &lt;/ul>
+        &lt;/div>
+        &lt;div className="flex border-t">
+          &lt;button
+            className="flex-1 p-2 text-red-500 hover:bg-red-100 transition-colors duration-200 disabled:opacity-50"
+            onClick={handleCancel}
+            disabled={isCancellingOrder || isProcessing}
+          >
+            &lt;XCircle className="mx-auto" />
+          &lt;/button>
+          &lt;button
+            className="flex-1 p-2 text-green-500 hover:bg-green-100 transition-colors duration-200 disabled:opacity-50"
+            onClick={handleComplete}
+            disabled={isCompletingOrder || isProcessing}
+          >
+            &lt;CheckCircle className="mx-auto" />
+          &lt;/button>
+        &lt;/div>
+      &lt;/div>
+      &lt;Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        &lt;DialogContent>
+          &lt;DialogHeader>
+            &lt;DialogTitle>Cancel Order&lt;/DialogTitle>
+            &lt;DialogDescription>
+              Are you sure you want to cancel this order? This action cannot be undone.
+            &lt;/DialogDescription>
+          &lt;/DialogHeader>
+          &lt;DialogFooter>
+            &lt;Button variant="outline" onClick={() => setIsDialogOpen(false)}>No, keep order&lt;/Button>
+            &lt;Button variant="destructive" onClick={confirmCancel}>Yes, cancel order&lt;/Button>
+          &lt;/DialogFooter>
+        &lt;/DialogContent>
+      &lt;/Dialog>
+    &lt;/>
+  )
+}
+
+/**
+ * The KitchenDisplay component displays a list of orders in the kitchen display view.
+ * It fetches incomplete orders from the server and updates the list every 5 seconds.
+ * Allows for marking orders as completed and cancelling orders.
+ */
+export function KitchenDisplay() {
+  const [orders, setOrders] = useState&lt;Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const processingRef = useRef(false)
+
+  useEffect(() => {
+  /**
+   * Fetches the list of incomplete orders from the server.
+   * If the request is already in progress, it does nothing.
+   * It sets the `loading` state to true before the request and false after.
+   * If the request fails, it logs an error message.
+   * If the request succeeds, it updates the `orders` state by adding new orders and sorting the list.
+   */
+    const fetchOrders = async () => {
+      if (processingRef.current) return
+
+      processingRef.current = true
+      setIsProcessing(true)
+
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/incomplete-orders`)
+        if (!response.ok) {
+          throw new Error('Failed to fetch orders')
+        }
+        const data: Order[] = await response.json()
+        setOrders(prevOrders => {
+          const newOrders = data.filter(order => !prevOrders.some(prevOrder => prevOrder.id === order.id))
+          return [...prevOrders, ...newOrders].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+        })
+        setLoading(false)
+      } catch (error) {
+        console.error('Error fetching orders:', error)
+        setLoading(false)
+      } finally {
+        processingRef.current = false
+        setIsProcessing(false)
+      }
+    }
+
+    fetchOrders()
+    const interval = setInterval(fetchOrders, 5000)
+
+    return () => clearInterval(interval)
+  }, [])
+  /**
+   * Handles the status change of an order by making a POST request to the server.
+   * If the request is already in progress, it does nothing.
+   * It sets the `isProcessing` state to true before the request and false after.
+   * If the request fails, it logs an error message.
+   * If the request succeeds, it updates the `orders` state by changing the status of the order.
+   * If the new status is 'completed', it removes the order from the list after a fade-out animation.
+   * 
+   * @async
+   * @function
+   * @name handleStatusChange
+   * @param {string} id - The ID of the order to update.
+   * @param {OrderStatus} newStatus - The new status of the order.
+   * @returns {Promise&lt;void>} A promise that resolves when the status change has been completed.
+   */
+  const handleStatusChange = async (id: string, newStatus: OrderStatus) => {
+    if (processingRef.current) return
+
+    processingRef.current = true
+    setIsProcessing(true)
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/order-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: id }),
+      })
+
+      if (response.ok) {
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === id ? { ...order, status: newStatus } : order
+          )
+        )
+
+        // Remove completed orders after fade out animation
+        if (newStatus === 'completed') {
+          setTimeout(() => {
+            setOrders(prevOrders => prevOrders.filter(order => order.id !== id))
+          }, 500)
+        }
+      } else {
+        throw new Error('Failed to update order status')
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error)
+    } finally {
+      processingRef.current = false
+      setIsProcessing(false)
+    }
+  }
+
+  /**
+   * Handles the cancellation of an order by making a POST request to the server.
+   * If the request is already in progress, it does nothing.
+   * It sets the `isProcessing` state to true before the request and false after.
+   * If the request fails, it logs an error message.
+   * If the request succeeds, it updates the `orders` state by changing the status of the order to 'cancelled'.
+   * If the new status is 'cancelled', it removes the order from the list after a fade-out animation.
+   * 
+   * @async
+   * @function
+   * @name handleCancel
+   * @param {string} id - The ID of the order to cancel.
+   * @returns {Promise&lt;void>} A promise that resolves when the cancellation has been completed.
+   */
+  const handleCancel = async (id: string) => {
+    if (processingRef.current) return
+
+    processingRef.current = true
+    setIsProcessing(true)
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/order-cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: id }),
+      })
+
+      if (response.ok) {
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === id ? { ...order, status: 'cancelled' } : order
+          )
+        )
+
+        // Remove cancelled orders after fade out animation
+        setTimeout(() => {
+          setOrders(prevOrders => prevOrders.filter(order => order.id !== id))
+        }, 500)
+      } else {
+        throw new Error('Failed to cancel order')
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error)
+    } finally {
+      processingRef.current = false
+      setIsProcessing(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      &lt;div className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
+        &lt;Loader className="h-8 w-8 animate-spin" />
+      &lt;/div>
+    )
+  }
+
+  return (
+    &lt;div className="min-h-screen bg-gray-100">
+      &lt;div className="flex justify-between items-center p-4 bg-white border-b">
+        &lt;h1 className="text-2xl font-bold">Kitchen Display&lt;/h1>
+        &lt;LogoutButton />
+      &lt;/div>
+      {orders.length > 0 &amp;&amp; (
+        &lt;div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          &lt;div role="main" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {orders.map(order => (
+              &lt;OrderCard 
+                key={order.id} 
+                order={order} 
+                onStatusChange={handleStatusChange} 
+                onCancel={handleCancel}
+                isProcessing={isProcessing}
+              />
+            ))}
+          &lt;/div>
+        &lt;/div>
+      )}
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

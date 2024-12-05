@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: menu-items.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: menu-items.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use client'
+
+import { useState, useEffect } from 'react'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Loader } from "lucide-react"
+
+/**
+ * @typedef MenuItem
+ * @property {number} id - The unique identifier for the menu item.
+ * @property {string} name - The name of the menu item.
+ * @property {string} type - The type of the menu item.
+ * @property {number} price - The price of the menu item.
+ * @property {number[]} ingredients - The list of ingredient IDs that make up the menu item.
+ * @property {boolean} active - Whether the menu item is active or not.
+ * @property {string} image_url - The URL of the image for the menu item.
+ * @property {string} description - The description of the menu item.
+ */
+
+interface MenuItem {
+  id: number
+  name: string
+  type: string
+  price: number
+  ingredients: number[]
+  active: boolean
+  image_url: string
+  description: string
+}
+
+/**
+ * @typedef Ingredient
+ * @property {number} id - The unique identifier for the ingredient.
+ * @property {string} name - The name of the ingredient.
+ */
+interface Ingredient {
+  id: number
+  name: string
+}
+
+/**
+ * MenuItems component.
+ *
+ * @returns The MenuItems component.
+ */
+export function MenuItems() {
+  const [menuItems, setMenuItems] = useState&lt;MenuItem[]>([])
+  const [editingItem, setEditingItem] = useState&lt;MenuItem | null>(null)
+  const [ingredients, setIngredients] = useState&lt;Ingredient[]>([])
+  const [newIngredient, setNewIngredient] = useState('')
+  const [imageFile, setImageFile] = useState&lt;File | null>(null)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  /**
+   * Fetches the list of menu items from the API.
+   * 
+   * @async
+   * @function
+   * @name fetchMenuItems
+   * @returns {Promise&lt;void>}
+   * @throws Will log an error message if the fetch fails.
+   */
+  const fetchMenuItems = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/items`)
+      if (response.ok) {
+        const data = await response.json()
+        setMenuItems(data)
+      }
+    } catch (error) {
+      console.error('Error fetching menu items:', error)
+    }
+  }
+
+  /**
+   * Fetches the list of ingredients from the API.
+   * 
+   * @async
+   * @function
+   * @name fetchIngredients
+   * @returns {Promise&lt;void>}
+   * @throws Will log an error message if the fetch fails.
+   */
+  const fetchIngredients = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingredients`)
+      if (response.ok) {
+        const data = await response.json()
+        setIngredients(data)
+      }
+    } catch (error) {
+      console.error('Error fetching ingredients:', error)
+    }
+  }
+
+  /**
+   * Fetches the list of ingredients and menu items from the API.
+   * 
+   * @async
+   * @function
+   * @name fetchData
+   * @returns {Promise&lt;void>}
+   */
+  const fetchData = async () => {
+    await fetchIngredients()
+    await fetchMenuItems()
+  }
+
+  /**
+   * Handles adding a new ingredient to the list of ingredients.
+   * 
+   * @async
+   * @function
+   * @name handleAddIngredient
+   * @returns {Promise&lt;void>}
+   */
+  const handleAddIngredient = async () => {
+    if (!newIngredient) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newIngredient, quantity: 0, price: 0, threshold: 0 }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setIngredients(prev => [...prev, { id: data.id, name: newIngredient }])
+        setEditingItem(prev => prev ? { ...prev, ingredients: [...prev.ingredients, data.id] } : null)
+        setNewIngredient('')
+        toast({
+          title: "Success",
+          description: "Ingredient added successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error adding new ingredient:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add ingredient",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Handles adding a new menu item to the list of menu items.
+   * 
+   * @async
+   * @function
+   * @name handleAddMenuItem
+   * @returns {Promise&lt;void>}
+   */
+  const handleAddMenuItem = async () => {
+    if (!editingItem) return
+
+    if (editingItem.price &lt; 0) {
+      toast({
+        title: "Error",
+        description: "Price cannot be negative",
+        variant: "destructive",
+      })
+      return
+    }
+
+    let base64Image = ""
+    if (imageFile) {
+      base64Image = await convertToBase64(imageFile)
+    }
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editingItem,
+          image: base64Image,
+        }),
+      })
+      if (response.ok) {
+        fetchMenuItems()
+        setEditingItem(null)
+        setImageFile(null)
+        toast({
+          title: "Success",
+          description: "Menu item added successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error adding menu item:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add menu item",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Handles updating an existing menu item in the list of menu items.
+   * 
+   * @async
+   * @function
+   * @name handleUpdateMenuItem
+   * @returns {Promise&lt;void>}
+   */
+  const handleUpdateMenuItem = async () => {
+    if (!editingItem) return
+
+    let base64Image = ""
+    if(imageFile) {
+      base64Image = await convertToBase64(imageFile)
+    }
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/items`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editingItem,
+          image: base64Image,
+        }),
+      })
+      if (response.ok) {
+        fetchMenuItems()
+        setEditingItem(null)
+        setImageFile(null)
+        toast({
+          title: "Success",
+          description: "Menu item updated successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error updating menu item:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update menu item",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Handles deleting an existing menu item from the list of menu items.
+   * 
+   * @async
+   * @function
+   * @name handleDeleteMenuItem
+   * @returns {Promise&lt;void>}
+   */
+  const handleDeleteMenuItem = async () => {
+    if (!editingItem) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/items/${editingItem.id}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        fetchMenuItems()
+        setEditingItem(null)
+        toast({
+          title: "Success",
+          description: "Menu item deleted successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting menu item:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete menu item",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Handles uploading an image for the menu item.
+   * 
+   * @function
+   * @name handleImageUpload
+   * @param {React.ChangeEvent&lt;HTMLInputElement>} e - The event object.
+   */
+  const handleImageUpload = (e: React.ChangeEvent&lt;HTMLInputElement>) => {
+    if (e.target.files &amp;&amp; e.target.files[0]) {
+      setImageFile(e.target.files[0])
+    }
+  }
+
+  /**
+   * Converts a file to a base64 string.
+   * 
+   * @function
+   * @name convertToBase64
+   * @param {File}
+   * @returns {Promise&lt;string>}
+   * @throws Will reject the promise if there is an error.
+   */
+  const convertToBase64 = (file: File): Promise&lt;string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = error => reject(error)
+    })
+  }
+
+
+  if (menuItems.length === 0) {
+    return (
+      &lt;div className="flex h-screen items-center justify-center">
+        &lt;Loader className="h-12 w-12 animate-spin text-primary" />
+      &lt;/div>
+    )
+  }
+
+  return (
+    &lt;div className="space-y-4">
+      &lt;Dialog open={!!editingItem} onOpenChange={(open) => {
+        if (open) setEditingItem({ id: 0, name: '', type: '', price: 0, ingredients: [], active: true, image_url: '', description: '' })
+        else setEditingItem(null)
+      }}>
+        &lt;DialogTrigger asChild>
+          &lt;Button>Add Menu Item&lt;/Button>
+        &lt;/DialogTrigger>
+        &lt;DialogContent className="max-w-md">
+          &lt;DialogHeader>
+            &lt;DialogTitle>{editingItem?.id ? 'Edit Menu Item' : 'Add New Menu Item'}&lt;/DialogTitle>
+          &lt;/DialogHeader>
+          {editingItem &amp;&amp; (
+            &lt;div className="space-y-4">
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="name">Name&lt;/Label>
+                &lt;Input
+                  id="name"
+                  value={editingItem.name}
+                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="type">Type&lt;/Label>
+                &lt;Select
+                  value={editingItem.type}
+                  onValueChange={(value) => setEditingItem({ ...editingItem, type: value })}
+                >
+                  &lt;SelectTrigger id="type">
+                    &lt;SelectValue placeholder="Select a type" />
+                  &lt;/SelectTrigger>
+                  &lt;SelectContent>
+                    &lt;SelectItem value="side">Side&lt;/SelectItem>
+                    &lt;SelectItem value="entree">Entree&lt;/SelectItem>
+                    &lt;SelectItem value="appetizer">Appetizer&lt;/SelectItem>
+                    &lt;SelectItem value="fcookie">Fortune Cookie&lt;/SelectItem>
+                    &lt;SelectItem value="size">Size&lt;/SelectItem>
+                    &lt;SelectItem value="drink">Drink&lt;/SelectItem>
+                  &lt;/SelectContent>
+                &lt;/Select>
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="price">Price&lt;/Label>
+                &lt;Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editingItem.price}
+                  onChange={(e) => setEditingItem({ ...editingItem, price: parseFloat(e.target.value) })}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="ingredients">Ingredients&lt;/Label>
+                &lt;Select
+                  onValueChange={(value) => setEditingItem({ ...editingItem, ingredients: [...editingItem.ingredients, parseInt(value)] })}
+                >
+                  &lt;SelectTrigger>
+                    &lt;SelectValue placeholder="Select ingredient" />
+                  &lt;/SelectTrigger>
+                  &lt;SelectContent>
+                    {ingredients.map((ingredient) => (
+                      &lt;SelectItem key={ingredient.id} value={ingredient.id.toString()}>
+                        {ingredient.name}
+                      &lt;/SelectItem>
+                    ))}
+                  &lt;/SelectContent>
+                &lt;/Select>
+                &lt;div className="flex space-x-2 mt-2">
+                  &lt;Input
+                    placeholder="New ingredient"
+                    value={newIngredient}
+                    onChange={(e) => setNewIngredient(e.target.value)}
+                  />
+                  &lt;Button onClick={handleAddIngredient}>Add&lt;/Button>
+                &lt;/div>
+                &lt;div className="flex flex-wrap gap-2 mt-2">
+                  {editingItem.ingredients.map((id) => {
+                    const ingredient = ingredients.find(i => i.id === id)
+                    return ingredient ? (
+                      &lt;Badge key={id} variant={"outline"}>
+                        {ingredient.name}
+                        &lt;Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-1 p-0 h-4 w-4"
+                          onClick={() => setEditingItem({
+                            ...editingItem,
+                            ingredients: editingItem.ingredients.filter(i => i !== id)
+                          })}
+                        >
+                          ×
+                        &lt;/Button>
+                      &lt;/Badge>
+                    ) : null
+                  })}
+                &lt;/div>
+              &lt;/div>
+              {editingItem.id !== 0 &amp;&amp; (
+                &lt;div className="space-y-2">
+                  &lt;Label htmlFor="active" className="mr-2">Active&lt;/Label>
+                  &lt;Checkbox
+                    id="active"
+                    checked={editingItem.active}
+                    onCheckedChange={(checked) => setEditingItem({ ...editingItem, active: checked as boolean })}
+                  />
+              &lt;/div>
+              )}
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="image">Image&lt;/Label>
+                &lt;Input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="description">Description&lt;/Label>
+                &lt;Input
+                  id="description"
+                  value={editingItem.description}
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                />
+              &lt;/div>
+              &lt;DialogFooter>
+                &lt;Button onClick={editingItem.id ? handleUpdateMenuItem : handleAddMenuItem} className="bg-green-500 hover:bg-green-600">
+                  {editingItem.id ? 'Update Menu Item' : 'Add Menu Item'}
+                &lt;/Button>
+                {editingItem.id !== 0 &amp;&amp; (
+                  &lt;AlertDialog>
+                    &lt;AlertDialogTrigger asChild>
+                      &lt;Button>Delete Menu Item&lt;/Button>
+                    &lt;/AlertDialogTrigger>
+                    &lt;AlertDialogContent>
+                      &lt;AlertDialogHeader>
+                        &lt;AlertDialogTitle>Are you sure?&lt;/AlertDialogTitle>
+                        &lt;AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the menu item.
+                        &lt;/AlertDialogDescription>
+                      &lt;/AlertDialogHeader>
+                      &lt;AlertDialogFooter>
+                        &lt;AlertDialogCancel>Cancel&lt;/AlertDialogCancel>
+                        &lt;AlertDialogAction onClick={handleDeleteMenuItem}>Delete&lt;/AlertDialogAction>
+                      &lt;/AlertDialogFooter>
+                    &lt;/AlertDialogContent>
+                  &lt;/AlertDialog>
+                )}
+              &lt;/DialogFooter>
+            &lt;/div>
+          )}
+        &lt;/DialogContent>
+      &lt;/Dialog>
+      &lt;Table>
+        &lt;TableHeader>
+          &lt;TableRow>
+            &lt;TableHead>ID&lt;/TableHead>
+            &lt;TableHead>Name&lt;/TableHead>
+            &lt;TableHead>Type&lt;/TableHead>
+            &lt;TableHead>Price&lt;/TableHead>
+            &lt;TableHead>Ingredients&lt;/TableHead>
+            &lt;TableHead>Active&lt;/TableHead>
+            &lt;TableHead>Image URL&lt;/TableHead>
+            &lt;TableHead>Description&lt;/TableHead>
+            &lt;TableHead>Actions&lt;/TableHead>
+          &lt;/TableRow>
+        &lt;/TableHeader>
+        &lt;TableBody>
+          {menuItems.map((item) => (
+            &lt;TableRow key={item.id}>
+              &lt;TableCell>{item.id}&lt;/TableCell>
+              &lt;TableCell>{item.name}&lt;/TableCell>
+              &lt;TableCell>{item.type}&lt;/TableCell>
+              &lt;TableCell>${Number(item.price).toFixed(2)}&lt;/TableCell>
+              &lt;TableCell>
+                {item.ingredients.map(id => ingredients.find(i => i.id === id)?.name).join(', ')}
+              &lt;/TableCell>
+              &lt;TableCell>{item.active ? 'Yes' : 'No'}&lt;/TableCell>
+              &lt;TableCell>{item.image_url}&lt;/TableCell>
+              &lt;TableCell>{item.description}&lt;/TableCell>
+              &lt;TableCell>
+                &lt;Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingItem(item)}
+                >
+                  Edit
+                &lt;/Button>
+              &lt;/TableCell>
+            &lt;/TableRow>
+          ))}
+        &lt;/TableBody>
+      &lt;/Table>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

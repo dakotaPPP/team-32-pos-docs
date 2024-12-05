@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: panda-express-menu.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: panda-express-menu.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use client'
+
+import { useState, useEffect } from 'react'
+import { Clock, CircleDollarSign, Gem } from 'lucide-react'
+import { WeatherComponent } from './ui/current-weather'
+import Image from 'next/image'
+
+/**
+ * @typedef MenuOption
+ * @property {string} name - The name of the menu option.
+ * @property {string} description - The description of the menu option.
+ * @property {string} price - The price of the menu option.
+ */
+interface MenuOption {
+  name: string;
+  description: string;
+  price: string;
+}
+
+/**
+ * @typedef Entree
+ * @property {string} name - The name of the entree.
+ * @property {string} image - The image URL of the entree.
+ * @property {number} price - The price of the entree.
+ */
+interface Entree {
+  name: string;
+  image: string;
+  price: number;
+}
+
+/**
+ * @typedef MoreChoice
+ * @property {string} name - The name of the choice.
+ * @property {string} price - The price of the choice.
+ */
+interface MoreChoice {
+  name: string;
+  price: string;
+}
+
+/**
+ * @typedef Drink
+ * @property {string} name - The name of the drink.
+ * @property {string} price - The price of the drink.
+ */
+interface Drink {
+  name: string;
+  price: string;
+}
+
+/**
+ * @typedef Side
+ * @property {string} name - The name of the side.
+ */
+interface Side {
+  name: string;
+}
+
+/**
+ * @typedef MenuData
+ * @property {MenuOption[]} meal_options - The meal options.
+ * @property {Entree[]} entrees - The entrees.
+ * @property {Drink[]} drinks - The drinks.
+ * @property {MoreChoice[]} a_la_carte_options - The a la carte options.
+ * @property {MoreChoice[]} more_choices - The more choices.
+ * @property {Side[]} sides - The sides.
+ */
+interface MenuData {
+  meal_options: MenuOption[];
+  entrees: Entree[];
+  drinks: Drink[];
+  a_la_carte_options: MoreChoice[];
+  more_choices: MoreChoice[];
+  sides: Side[];
+}
+
+
+
+// const placeholder = 'https://i.imgur.com/v4B31KT.png'
+/**
+ * A component that displays the Panda Express menu.
+ * This component fetches the menu data from the server and displays it in a grid layout.
+ * The menu data includes meal options, entrees, drinks, a la carte options, more choices, and sides.
+ * The component also displays the current time and weather.
+ * 
+ * @returns A JSX element representing the Panda Express menu.
+ */
+export function PandaExpressMenu() {
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [menuData, setMenuData] = useState&lt;MenuData>({
+    entrees: [],
+    meal_options: [],
+    drinks: [],
+    a_la_carte_options: [],
+    more_choices: [],
+    sides: [],
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+  /**
+   * Fetches the menu data from the server and stores it in state.
+   * 
+   * @async
+   * @function
+   * @name fetchMenuData
+   * @returns {Promise&lt;void>}
+   * @throws Will log an error message if the fetch fails.
+   */
+    const fetchMenuData = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/menu-items`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch menu data');
+        }
+        const data = await response.json();
+        console.log("Fetched menu data:", data); 
+        setMenuData(data); // Store fetched data in state
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchMenuData();
+  }, []);
+
+  if (!menuData) {
+    return &lt;div>Loading...&lt;/div>; // Show loading state while fetching data
+  }
+
+  const { entrees, meal_options, drinks, a_la_carte_options, more_choices, sides } = menuData;
+
+  return (
+    &lt;div role="banner" className="min-h-screen bg-red-50">
+      &lt;header className="bg-red-600 text-white p-4 flex justify-between items-center">
+        &lt;h1 className="text-2xl font-bold">Panda Express&lt;/h1>
+        &lt;div className="flex items-center space-x-4">
+          &lt;div className="flex items-center">
+            &lt;WeatherComponent />
+          &lt;/div>
+          &lt;div className="flex items-center">
+            &lt;Clock className="mr-2" />
+            &lt;span>{(currentTime.toLocaleTimeString([],{hour: '2-digit', minute: '2-digit'}))}&lt;/span>
+          &lt;/div>
+        &lt;/div>
+      &lt;/header>
+
+      &lt;main role="main" className="container mx-auto p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
+        &lt;div className="space-y-4">
+          &lt;div className="bg-white p-4 rounded-lg shadow">
+            &lt;h2 className="text-xl font-bold mb-4">Pick a Meal&lt;/h2>
+            &lt;ul className="space-y-2">
+              {meal_options?.map((menu_option) => (
+                &lt;li key={menu_option.name} className="flex justify-between">
+                  &lt;div>
+                    &lt;span className="font-semibold">{menu_option.name}&lt;/span>
+                    &lt;p className="text-sm text-gray-600">{menu_option.description}&lt;/p>
+                  &lt;/div>
+                  &lt;span>{menu_option.price}&lt;/span>
+                &lt;/li>
+              ))}
+            &lt;/ul>
+          &lt;/div>
+          &lt;div className="bg-white p-4 rounded-lg shadow">
+            &lt;Image src="https://i.imgur.com/fYf1GtG.png" alt="Panda Logo" height="200" width="300" className="w-full h-auto rounded" />
+            &lt;div className="mt-4 text-sm text-gray-600">
+              &lt;p>&lt;CircleDollarSign className="inline mr-1" /> Premium Charge Per Entree: Small + $ .60 | Medium + $ 1.20 | Large + $1.80&lt;/p>
+              &lt;p>&lt;Gem className="inline mr-1" /> Premium Plus Charge Per Entree: Small + $ .80 | Medium + $ 1.60 | Large + $2.45&lt;/p>
+            &lt;/div>
+          &lt;/div>
+        &lt;/div>
+
+        &lt;div className="bg-white p-4 rounded-lg shadow lg:col-span-2 xl:col-span-3">
+          &lt;h2 className="text-xl font-bold mb-4">Entree Choices&lt;/h2>
+          &lt;div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {entrees?.map((entree) => (
+              &lt;div key={entree.name} className="text-center flex flex-col items-center">
+                &lt;Image src={entree.image} alt={entree.name} height="150" width="150" className="w-full h-auto rounded mb-2"/>
+                &lt;div className="flex items-center">
+                  {entree.price > 0 &amp;&amp; entree.price &lt;= 1.30 &amp;&amp; &lt;CircleDollarSign className="mr-1" />}
+                  {entree.price > 1.30  &amp;&amp; &lt;Gem className="mr-1" />}
+                  &lt;p className="font-semibold">{entree.name}&lt;/p>
+                &lt;/div>
+              &lt;/div>
+            ))}
+          &lt;/div>
+        &lt;/div>
+
+        &lt;div className="space-y-4 xl:col-span-1">
+          &lt;div className="bg-white p-4 rounded-lg shadow">
+            &lt;h2 className="text-xl font-bold mb-4">More Choices&lt;/h2>
+            &lt;ul className="space-y-2">
+              {more_choices?.map((more_choice) => (
+                &lt;li key={more_choice.name} className="flex justify-between">
+                  &lt;span>{more_choice.name}&lt;/span>
+                  &lt;span>{more_choice.price}&lt;/span>
+                &lt;/li>
+              ))}
+            &lt;/ul>
+          &lt;/div>
+          &lt;div className="bg-white p-4 rounded-lg shadow">
+            &lt;h2 className="text-xl font-bold mb-4">A La Carte Boxes&lt;/h2>
+            &lt;ul className="space-y-2">
+              {a_la_carte_options?.map((a_la_carte_option) => (
+                &lt;li key={a_la_carte_option.name} className="flex justify-between">
+                  &lt;span>{a_la_carte_option.name}&lt;/span>
+                  &lt;span>{a_la_carte_option.price}&lt;/span>
+                &lt;/li>
+              ))}
+            &lt;/ul>
+          &lt;/div>
+          &lt;div className="bg-white p-4 rounded-lg shadow">
+            &lt;h2 className="text-xl font-bold mb-4">Sides&lt;/h2>
+            &lt;ul className="space-y-2">
+              {sides?.map((side) => (
+                &lt;li key={side.name} className="flex justify-between">
+                  &lt;span>{side.name}&lt;/span>
+                &lt;/li>
+              ))}
+            &lt;/ul>
+          &lt;/div>
+          &lt;div className="bg-white p-4 rounded-lg shadow">
+            &lt;h2 className="text-xl font-bold mb-4">Drinks&lt;/h2>
+            &lt;ul className="space-y-2">
+              {drinks?.map((drink) => (
+                &lt;li key={drink.name} className="flex justify-between">
+                  &lt;span>{drink.name}&lt;/span>
+                  &lt;span>{drink.price}&lt;/span>
+                &lt;/li>
+              ))}
+            &lt;/ul>
+          &lt;/div>
+        &lt;/div>
+      &lt;/main>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

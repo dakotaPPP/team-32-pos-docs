@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: reports.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: reports.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use client'
+
+import { useState } from 'react'
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from 'recharts'
+import { ChartTooltip, ChartContainer } from "@/components/ui/chart"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ArrowUpDown } from 'lucide-react'
+import { Interface } from 'readline'
+
+interface HourlySales {
+  hour_starting: string;
+  totalhoursales: number;
+}
+
+interface EmployeeSales {
+  name: string;
+  sales: string;
+}
+
+interface ProductUsage {
+  Name: string;
+  "Quantity Used": number;
+}
+
+/**
+ * Represents hourly sales data.
+ * @typedef {Object} HourlySales
+ * @property {string} hour_starting - The starting hour of the sales period.
+ * @property {number} totalhoursales - The total sales for the hour.
+ */
+
+/**
+ * Represents employee sales data.
+ * @typedef {Object} EmployeeSales
+ * @property {string} name - The name of the employee.
+ * @property {string} sales - The sales amount as a string (e.g., "$100.00").
+ */
+
+/**
+ * Represents product usage data.
+ * @typedef {Object} ProductUsage
+ * @property {string} Name - The name of the product.
+ * @property {number} Quantity Used - The quantity of the product used.
+ */
+
+/**
+   * @typedef SalesTableData
+   * @property {string} hour - The hour of the sales data.
+   * @property {number} sales - The sales amount for the hour.
+  */
+interface SalesTableData {
+  hour: string;
+  sales: number;
+}
+
+/**
+ * Reports component for generating and displaying various types of reports.
+ * @returns {JSX.Element} The Reports component.
+ */
+export function Reports() {
+  const [reportType, setReportType] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [reportData, setReportData] = useState&lt;any>(null)
+  const [employeeSalesData, setEmployeeSalesData] = useState&lt;EmployeeSales[]>([])
+  const [sortColumn, setSortColumn] = useState&lt;'name' | 'sales' | 'quantity'>('name')
+  const [sortDirection, setSortDirection] = useState&lt;'asc' | 'desc'>('asc')
+  const [currentReportType, setCurrentReportType] = useState('')
+  const [productUsageData, setProductUsageData] = useState&lt;ProductUsage[]>([])
+
+  /**
+   * Generates the report based on the selected report type and date range.
+   * If the report type has changed since the last selection, an error is logged
+   * and the function returns without generating the report.
+   * @returns {Promise&lt;void>}
+   */
+  const handleGenerateReport = async () => {
+    if (reportType !== currentReportType) {
+      console.error('Report type mismatch. Please reselect the report type.')
+      return
+    }
+    let data;
+    switch (reportType) {
+      case 'x-report':
+        data = await fetchXReport();
+        break;
+      case 'z-report':
+        data = await fetchZReport();
+        break;
+      case 'sales':
+      case 'employee-sales':
+      case 'product-usage':
+        data = await fetchReportWithDateRange(reportType, startDate, endDate);
+        break;
+      default:
+        console.error('Invalid report type');
+        return;
+    }
+    setReportData(data);
+  }
+
+  /**
+   * Fetches the X-report data from the API.
+   * @async
+   * @function
+   * @name fetchXReport
+   * @returns {Promise&lt;HourlySales[]>} The list of hourly sales data.
+   */
+  const fetchXReport = async () => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/x-report`);
+    return await response.json();
+  }
+
+  /**
+   * Fetches the Z-report data from the API.
+   * @async
+   * @function
+   * @name fetchZReport
+   * @returns {Promise&lt;HourlySales[]>} The list of hourly sales data.
+   */
+  const fetchZReport = async () => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/z-report`);
+    return await response.json();
+  }
+
+  /**
+   * Fetches the report data from the API for the given report type and date range.
+   * @async
+   * @function
+   * @name fetchReportWithDateRange
+   * @param {string} type - The type of report to generate.
+   * @param {string} start - The start date of the report period.
+   * @param {string} end - The end date of the report period.
+   * @returns {Promise&lt;string | EmployeeSales[] | ProductUsage[]>} The report data.
+   * If the report type is 'sales', the return value is a string containing the report data.
+   * If the report type is 'employee-sales', the return value is an array of employee sales data.
+   * If the report type is 'product-usage', the return value is an array of product usage data.
+   */
+  const fetchReportWithDateRange = async (type: string, start: string, end: string) => {
+    const endpoint = type === 'sales' 
+    ? '/sales-report' 
+    : type === 'employee-sales' 
+    ? '/employee-sales-report'
+    : '/product-usage-report';
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ start, finish: end }),
+    });
+    
+    if (type === 'sales') {
+      const text = await response.text();
+      return text.replace(/^"|"$/g, '');
+    } else if (type === 'employee-sales') {
+      const data = await response.json();
+      setEmployeeSalesData(data);
+      return data;
+    } else {
+      const data = await response.json();
+      setProductUsageData(data);
+      return data;
+    }
+  }
+
+  /**
+   * Renders a table of sales data.
+   * @function
+   * @name renderSalesTable
+   * @param {SalesTableData[]} chartData - The sales data to render.
+   * @returns {JSX.Element} The rendered table.
+   */
+  const renderSalesTable = (chartData: { hour: string; sales: number }[]) => {
+    return (
+      &lt;div className="mt-4 w-[200px]">
+        &lt;Table>
+          &lt;TableHeader>
+            &lt;TableRow>
+              &lt;TableHead>Time&lt;/TableHead>
+              &lt;TableHead className="text-right">Sales ($)&lt;/TableHead>
+            &lt;/TableRow>
+          &lt;/TableHeader>
+          &lt;TableBody>
+            {chartData.map((row, index) => (
+              &lt;TableRow key={index}>
+                &lt;TableCell>{row.hour}&lt;/TableCell>
+                &lt;TableCell className="text-right">${row.sales.toFixed(2)}&lt;/TableCell>
+              &lt;/TableRow>
+            ))}
+          &lt;/TableBody>
+        &lt;/Table>
+      &lt;/div>
+    );
+  }
+
+  /**
+   * Renders a chart of hourly sales data.
+   * @function
+   * @name renderChart
+   * @returns {JSX.Element} The rendered chart.
+   */
+  const renderChart = () => {
+    if (!reportData || (reportType !== 'x-report' &amp;&amp; reportType !== 'z-report')) return null;
+
+    const hourlyData = reportData as HourlySales[];
+    
+    const sortedData = [...hourlyData].sort((a, b) => 
+      new Date(a.hour_starting).getTime() - new Date(b.hour_starting).getTime()
+    );
+
+    const chartData = sortedData.map((item) => ({
+      hour: new Date(item.hour_starting).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      }),
+      sales: item.totalhoursales
+    }));
+
+    return (
+      &lt;Card className="w-full mt-4">
+        &lt;CardHeader>
+          &lt;CardTitle>{reportType === 'x-report' ? 'X-Report' : 'Z-Report'}&lt;/CardTitle>
+          &lt;CardDescription>Hourly sales breakdown&lt;/CardDescription>
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;ChartContainer
+            config={{
+              sales: {
+                label: "Sales ($)",
+                color: "hsl(var(--chart-1))",
+              },
+            }}
+            className="h-[400px] w-full"
+          >
+            &lt;ResponsiveContainer width="100%" height="100%">
+              &lt;LineChart data={chartData}>
+                &lt;CartesianGrid strokeDasharray="3 3" />
+                &lt;XAxis 
+                  dataKey="hour"
+                  label={{ value: 'Time', position: 'bottom', offset: 0 }}
+                />
+                &lt;YAxis 
+                  label={{ 
+                    value: 'Sales ($)', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                  }}
+                />
+                &lt;ChartTooltip 
+                  content={({ active, payload }) => {
+                    if (active &amp;&amp; payload &amp;&amp; payload.length) {
+                      return (
+                        &lt;div className="bg-white p-2 border rounded shadow">
+                          &lt;p>Time: {payload[0].payload.hour}&lt;/p>
+                          &lt;p>Sales: ${Number(payload[0].value).toFixed(2)}&lt;/p>
+                        &lt;/div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                &lt;Legend />
+                &lt;Line 
+                  type="monotone" 
+                  dataKey="sales" 
+                  stroke="var(--color-sales)" 
+                  name="Sales" 
+                  dot={true}
+                  activeDot={{ r: 8 }}
+                />
+              &lt;/LineChart>
+            &lt;/ResponsiveContainer>
+          &lt;/ChartContainer>
+          {renderSalesTable(chartData)}
+        &lt;/CardContent>
+      &lt;/Card>
+    );
+  }
+
+  /**
+   * Renders a report of total sales and item frequencies.
+   * @function
+   * @name renderSalesReport
+   * @returns {JSX.Element} The rendered report.
+   */
+  const renderSalesReport = () => {
+    if (!reportData || reportType !== 'sales') return null;
+
+    return (
+      &lt;Card className="w-full mt-4">
+        &lt;CardHeader>
+          &lt;CardTitle>Sales Report&lt;/CardTitle>
+          &lt;CardDescription>Total sales and item frequencies&lt;/CardDescription>
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;div 
+            className="space-y-2"
+            dangerouslySetInnerHTML={{ __html: reportData }}
+          />
+        &lt;/CardContent>
+      &lt;/Card>
+    );
+  }
+
+  /**
+   * Renders a report of total sales by employee.
+   * @function
+   * @name renderEmployeeSalesReport
+   * @returns {JSX.Element} The rendered report.
+   */
+  const renderEmployeeSalesReport = () => {
+    if (reportType !== 'employee-sales' || employeeSalesData.length === 0) return null;
+
+    const sortedData = [...employeeSalesData].sort((a, b) => {
+      if (sortColumn === 'name') {
+        return sortDirection === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      } else {
+        const aValue = parseFloat(a.sales.replace('$', '').replace(',', ''));
+        const bValue = parseFloat(b.sales.replace('$', '').replace(',', ''));
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+    });
+
+    /**
+     * Handles sorting of the employee sales report.
+     * @function
+     * @name handleSort
+     * @param {string} column - The column to sort by.
+     * @returns {void}
+     */
+    const handleSort = (column: 'name' | 'sales') => {
+      if (column === sortColumn) {
+        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      } else {
+        setSortColumn(column);
+        setSortDirection('asc');
+      }
+    };
+
+
+    return (
+      &lt;Card className="w-full mt-4">
+        &lt;CardHeader>
+          &lt;CardTitle>Employee Sales Report&lt;/CardTitle>
+          &lt;CardDescription>Sales breakdown by employee&lt;/CardDescription>
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;Table className="mt-4 w-[600px]">
+            &lt;TableHeader>
+              &lt;TableRow>
+                &lt;TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
+                  Employee Name &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+                &lt;/TableHead>
+                &lt;TableHead className="cursor-pointer text-right" onClick={() => handleSort('sales')}>
+                  Sales &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+                &lt;/TableHead>
+              &lt;/TableRow>
+            &lt;/TableHeader>
+            &lt;TableBody>
+              {sortedData.map((employee, index) => (
+                &lt;TableRow key={index}>
+                  &lt;TableCell>{employee.name}&lt;/TableCell>
+                  &lt;TableCell className="text-right">{employee.sales}&lt;/TableCell>
+                &lt;/TableRow>
+              ))}
+            &lt;/TableBody>
+          &lt;/Table>
+        &lt;/CardContent>
+      &lt;/Card>
+    );
+  }
+
+  const renderProductUsageReport = () => {
+    if (reportType !== 'product-usage' || productUsageData.length === 0) return null;
+
+    const sortedData = [...productUsageData].sort((a, b) => {
+      if (sortColumn === 'name') {
+        return sortDirection === 'asc' ? a.Name.localeCompare(b.Name) : b.Name.localeCompare(a.Name);
+      } else {
+        return sortDirection === 'asc' ? a["Quantity Used"] - b["Quantity Used"] : b["Quantity Used"] - a["Quantity Used"];
+      }
+    });
+
+    const handleSort = (column: 'name' | 'quantity') => {
+      if (column === sortColumn) {
+        setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      } else {
+        setSortColumn(column);
+        setSortDirection('asc');
+      }
+    };
+
+    return (
+      &lt;Card className="w-full mt-4">
+        &lt;CardHeader>
+          &lt;CardTitle>Product Usage Report&lt;/CardTitle>
+          &lt;CardDescription>Usage breakdown by product&lt;/CardDescription>
+        &lt;/CardHeader>
+        &lt;CardContent>
+          &lt;Table className="mt-4 w-[600px]">
+            &lt;TableHeader>
+              &lt;TableRow>
+                &lt;TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
+                  Product Name &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+                &lt;/TableHead>
+                &lt;TableHead className="cursor-pointer text-right" onClick={() => handleSort('quantity')}>
+                  Quantity Used &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+                &lt;/TableHead>
+              &lt;/TableRow>
+            &lt;/TableHeader>
+            &lt;TableBody>
+              {sortedData.map((product, index) => (
+                &lt;TableRow key={index}>
+                  &lt;TableCell>{product.Name}&lt;/TableCell>
+                  &lt;TableCell className="text-right">{product["Quantity Used"]}&lt;/TableCell>
+                &lt;/TableRow>
+              ))}
+            &lt;/TableBody>
+          &lt;/Table>
+        &lt;/CardContent>
+      &lt;/Card>
+    );
+  };
+
+  return (
+    &lt;Card>
+      &lt;CardHeader>
+        &lt;CardTitle>Generate Reports&lt;/CardTitle>
+        &lt;CardDescription>Select a report type and date range to generate a report.&lt;/CardDescription>
+      &lt;/CardHeader>
+      &lt;CardContent>
+        &lt;div className="space-y-4">
+          &lt;div className="space-y-2">
+            &lt;Label htmlFor="report-type">Report Type&lt;/Label>
+            &lt;Select onValueChange={value => {
+              if (value !== currentReportType) {
+                setReportType(value)
+                setCurrentReportType(value)
+                setReportData(null)
+                setEmployeeSalesData([])
+                setProductUsageData([])
+              }
+            }}>
+              &lt;SelectTrigger id="report-type">
+                &lt;SelectValue placeholder="Select a report type" />
+              &lt;/SelectTrigger>
+              &lt;SelectContent>
+                &lt;SelectItem value="x-report">X-Report&lt;/SelectItem>
+                &lt;SelectItem value="z-report">Z-Report&lt;/SelectItem>
+                &lt;SelectItem value="sales">Sales Report&lt;/SelectItem>
+                &lt;SelectItem value="employee-sales">Employee Sales Report&lt;/SelectItem>
+                &lt;SelectItem value="product-usage">Product Usage Report&lt;/SelectItem>
+              &lt;/SelectContent>
+            &lt;/Select>
+          &lt;/div>
+          {(reportType === 'sales' || reportType === 'employee-sales' || reportType === 'product-usage') &amp;&amp; (
+            &lt;div className="grid grid-cols-2 gap-4">
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="start-date">Start Date&lt;/Label>
+                &lt;Input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="end-date">End Date&lt;/Label>
+                &lt;Input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              &lt;/div>
+            &lt;/div>
+          )}
+          &lt;Button onClick={handleGenerateReport}>Generate Report&lt;/Button>
+        &lt;/div>
+        {renderChart()}
+        {renderSalesReport()}
+        {renderEmployeeSalesReport()}
+        {renderProductUsageReport()}
+      &lt;/CardContent>
+    &lt;/Card>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

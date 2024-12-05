@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: kiosk-view.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: kiosk-view.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { ArrowLeft, Trash2, Loader, X, Plus, Minus, Sun, Moon } from 'lucide-react'
+
+/**
+ * @typedef {Object} MenuItem
+ * @property {number} id - The unique identifier for the menu item.
+ * @property {string} name - The name of the menu item.
+ * @property {string} price - The price of the menu item.
+ * @property {string} category - The category of the menu item.
+ * @property {string} image - The URL of the image for the menu item.
+ * @property {string | null} description - The description of the menu item.
+ * @property {string[]} allergens - The allergens of the menu item.
+ */
+interface MenuItem {
+  id: number
+  name: string
+  price: string
+  category: string
+  image: string
+  description: string | null
+  allergens: string[]
+}
+
+/**
+ * @typedef {Object} MenuData
+ * @property {MenuItem[]} menu_items - The list of menu items.
+ */
+interface MenuData {
+  menu_items: MenuItem[]
+}
+
+/**
+ * @typedef {Object} OrderItem
+ * @property {number} id - The unique identifier for the order item.
+ * @property {number} size - The size of the order item.
+ * @property {number} side_0 - The first side of the order item.
+ * @property {number} side_1 - The second side of the order item.
+ * @property {number} entree_0 - The first entree of the order item.
+ * @property {number} entree_1 - The second entree of the order item.
+ * @property {number} entree_2 - The third entree of the order item.
+ * @property {number} price - The price of the order item.
+ * @property {string} category - The category of the order item.
+ * @property {string} name - The name of the order item.
+ * @property {Record&lt;number, number>} entreeQuantities - The quantities of each entree in the order item.
+ * @property {Record&lt;number, number>} sideQuantities - The quantities of each side in the order item.
+ */
+interface OrderItem {
+  id: number
+  size: number
+  side_0: number
+  side_1: number
+  entree_0: number
+  entree_1: number
+  entree_2: number
+  price: number
+  category: string
+  name: string
+  entreeQuantities: Record&lt;number, number>
+  sideQuantities: Record&lt;number, number>
+}
+
+/**
+ * @typedef {Object} SizeConfig
+ * @property {string} name - The name of the size.
+ * @property {number} entrees - The number of entrees allowed for the size.
+ * @property {number} sides - The number of sides allowed for the size.
+ */
+const sizeConfig = {
+  23: { name: 'Bowl', entrees: 1, sides: 1 },
+  24: { name: 'Plate', entrees: 2, sides: 1 },
+  25: { name: 'Bigger Plate', entrees: 3, sides: 1 },
+  26: { name: 'Panda Cub Meal', entrees: 1, sides: 1 },
+  27: { name: 'Family Meal', entrees: 3, sides: 2 },
+  28: { name: 'Small A La Carte', entrees: 1, sides: 1, allowEitherOr: true },
+  29: { name: 'Medium A La Carte', entrees: 1, sides: 1, allowEitherOr: true },
+  30: { name: 'Large A La Carte', entrees: 1, sides: 1, allowEitherOr: true },
+}
+
+const TAX_RATE = 0.0825 // 8.25% tax rate
+
+/**
+ * The KioskView component.
+ * @param {Object} props
+ * @param {string} [props.language='en'] - The language to use for translations.
+ */
+export function KioskView({ language = 'en' }: { language?: string }) {
+  const [orderItems, setOrderItems] = useState&lt;OrderItem[]>([])
+  const [menuData, setMenuData] = useState&lt;MenuData>({ menu_items: [] })
+  const [currentOrder, setCurrentOrder] = useState&lt;OrderItem | null>(null)
+  const [selectedEntrees, setSelectedEntrees] = useState&lt;Record&lt;number, number>>({})
+  const [selectedSides, setSelectedSides] = useState&lt;Record&lt;number, number>>({})
+  const [view, setView] = useState&lt;'menu' | 'customize'>('menu')
+  const [translations, setTranslations] = useState&lt;Record&lt;string, string>>({})
+  const [isTranslating, setIsTranslating] = useState(false)
+  const [orderConfirmation, setOrderConfirmation] = useState&lt;{ isOpen: boolean; orderId: string }>({ isOpen: false, orderId: '' })
+  const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [allergens, setAllergens] = useState&lt;string[]>([])
+  const [selectedAllergens, setSelectedAllergens] = useState&lt;string[]>([])
+  const [isAllergenDialogOpen, setIsAllergenDialogOpen] = useState(false)
+  const [highContrast, setHighContrast] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+  /**
+   * Fetches the menu data from the API and stores it in state.
+   * 
+   * @async
+   * @function
+   * @name fetchMenuData
+   * @returns {Promise&lt;void>}
+   * @throws Will log an error message if the fetch fails.
+   */
+    const fetchMenuData = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/menu-items-kiosk`)
+        if (!response.ok) {
+          throw new Error('Failed to fetch menu data')
+        }
+        const data = await response.json()
+        const parsedData = parseMenuData(data)
+        setMenuData(parsedData)
+        setAllergens(getAllergens(parsedData.menu_items))
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    fetchMenuData()
+  }, [])
+
+  useEffect(() => {
+    if (language !== 'en') {
+      setIsTranslating(true)
+      translateTexts()
+    }
+  }, [language, menuData])
+
+  /**
+   * Takes raw menu data from the API and parses it into a usable format.
+   * 
+   * The raw menu data from the API does not contain allergen information. This
+   * function adds an 'allergens' property to each menu item which contains an
+   * array of strings representing the allergens present in the item.
+   * 
+   * @param {object} data - The raw menu data from the API.
+   * @returns {MenuData} The parsed menu data.
+   */
+  const parseMenuData = (data: any): MenuData => {
+    return {
+      menu_items: data.menu_items.map((item: any) => ({
+        ...item,
+        allergens: parseAllergens(item.description)
+      }))
+    }
+  }
+
+/**
+ * Extracts a list of allergens from a given description string.
+ * 
+ * The description is expected to contain a line starting with "Allergens:" 
+ * followed by a comma-separated list of allergens. If the description is null 
+ * or does not contain allergen information, an empty array is returned.
+ * 
+ * @param {string | null} description - The description of the item which may contain allergen information.
+ * @returns {string[]} An array of allergens extracted from the description.
+ */
+  const parseAllergens = (description: string | null): string[] => {
+    if (!description) return []
+    const allergenMatch = description.match(/Allergens: (.+)/)
+    if (!allergenMatch) return []
+    return allergenMatch[1].split(', ').map(allergen => allergen.trim())
+  }
+
+/**
+ * Extracts a unique list of allergens from an array of menu items.
+ * 
+ * Iterates through a list of menu items and collects all allergens
+ * into a set to ensure uniqueness. Returns an array of unique allergens.
+ * 
+ * @param {MenuItem[]} menuItems - The array of menu items to extract allergens from.
+ * @returns {string[]} An array of unique allergens found in the menu items.
+ */
+  const getAllergens = (menuItems: MenuItem[]): string[] => {
+    const allergenSet = new Set&lt;string>()
+    menuItems.forEach(item => {
+      item.allergens.forEach(allergen => allergenSet.add(allergen))
+    })
+    return Array.from(allergenSet)
+  }
+
+  /**
+   * Fetches translations for a list of strings from the API.
+   * 
+   * Takes a list of strings to translate, sends a POST request to the API
+   * for each string, and stores the translated strings in state.
+   * 
+   * The list of strings to translate is as follows:
+   * 
+   * 1. Select Your Meal
+   * 2. Drinks
+   * 3. More Choices
+   * 4. Customize Your Meal
+   * 5. Entree(s)
+   * 6. Side(s)
+   * 7. Add to Order
+   * 8. Your Order
+   * 9. Item
+   * 10. Price
+   * 11. Subtotal:
+   * 12. Tax:
+   * 13. Total:
+   * 14. Checkout
+   * 15. Clear All
+   * 16. Cancel Order
+   * 17. Thank you for your order!
+   * 18. Your order number is
+   * 19. Done ordering
+   * 20. Food Allergies? Click here to filter.
+   * 21. Select Your Allergens
+   * 22. Apply
+   * 23. ...allergens (extracted from menu items)
+   * 24. ...menu item names (extracted from menu items)
+   * 25. ...menu item descriptions (extracted from menu items)
+   * 
+   * These strings are translated to the target language specified by the
+   * 'language' prop.
+   * 
+   * @async
+   * @function
+   * @name translateTexts
+   * @returns {Promise&lt;void>}
+   * @throws Will log an error message if the fetch fails.
+   */
+  const translateTexts = async () => {
+    const textsToTranslate = [
+      'Select Your Meal',
+      'Drinks',
+      'More Choices',
+      'Customize Your Meal',
+      'Entree(s)',
+      'Side(s)',
+      'Add to Order',
+      'Your Order',
+      'Item',
+      'Price',
+      'Subtotal:',
+      'Tax:',
+      'Total:',
+      'Checkout',
+      'Clear All',
+      'Cancel Order',
+      'Thank you for your order!',
+      'Your order number is',
+      'Done ordering',
+      'Food Allergies? Click here to filter.',
+      'Select Your Allergens',
+      'Apply',
+      ...allergens,
+      ...menuData.menu_items.map(item => item.name),
+      ...menuData.menu_items.map(item => item.description || ''),
+    ]
+
+    const translationPromises = textsToTranslate.map(text =>
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/translate-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, targetLanguage: language }),
+      }).then(res => res.json())
+    )
+    const translatedTexts = await Promise.all(translationPromises)
+    const newTranslations: Record&lt;string, string> = {}
+    textsToTranslate.forEach((text, index) => {
+      newTranslations[text] = translatedTexts[index].translatedText
+    })
+    setTranslations(newTranslations)
+    setIsTranslating(false)
+  }
+
+  /**
+   * Returns the translated text if it exists in the translations, otherwise
+   * returns the original text.
+   *
+   * @param {string} text The text to be translated.
+   * @returns {string} The translated text or the original text if there is no translation.
+   */
+  const translate = (text: string) => {
+    return translations[text] || text
+  }
+
+/**
+ * Initializes a new order with the specified size and price, and updates the view to 'customize'.
+ * Sets the current order details, including meal options and resets selected entrees and sides.
+ * 
+ * @param {number} sizeId - The ID of the meal option size to set for the current order.
+ * @param {number} price - The price of the selected meal option.
+ */
+  const handleSizeClick = (sizeId: number, price: number) => {
+    setCurrentOrder({
+      id: sizeId,
+      size: sizeId,
+      side_0: -1,
+      side_1: -1,
+      entree_0: -1,
+      entree_1: -1,
+      entree_2: -1,
+      price: price,
+      category: 'meal_options',
+      name: sizeConfig[sizeId as keyof typeof sizeConfig].name,
+      entreeQuantities: {},
+      sideQuantities: {},
+    })
+    setSelectedEntrees({})
+    setSelectedSides({})
+    setView('customize')
+  }
+
+  /**
+   * Resets the view to 'menu', and resets the current order, selected entrees, and selected sides.
+   * 
+   * @function
+   * @name handleBackToMenu
+   * @returns {void}
+   */
+  const handleBackToMenu = () => {
+    setView('menu')
+    setCurrentOrder(null)
+    setSelectedEntrees({})
+    setSelectedSides({})
+  }
+
+  /**
+   * Handles the selection of an item in the dialog.
+   * Updates the selected entrees or sides with the given item ID, and resets the other category
+   * if the meal option is an a la carte.
+   * @param {string} category The category of the item, either 'side' or 'entree'.
+   * @param {number} itemId The ID of the item.
+   */
+  const handleItemSelection = (category: 'side' | 'entree', itemId: number) => {
+    if (!currentOrder) return;
+
+    const isALaCarte = [28, 29, 30].includes(currentOrder.size);
+    const config = sizeConfig[currentOrder.size as keyof typeof sizeConfig];
+
+    if (category === 'entree') {
+      setSelectedEntrees(prev => {
+        const newEntrees = { ...prev };
+        const totalEntrees = Object.values(newEntrees).reduce((sum, qty) => sum + qty, 0);
+        
+        if (totalEntrees &lt; config.entrees) {
+          newEntrees[itemId] = (newEntrees[itemId] || 0) + 1;
+        }
+        
+        return newEntrees;
+      });
+
+      if (isALaCarte) {
+        setSelectedSides({});
+      }
+    } else {
+      setSelectedSides(prev => {
+        const newSides = { ...prev };
+        const totalSides = Object.values(newSides).reduce((sum, qty) => sum + qty, 0);
+        
+        if (totalSides &lt; config.sides) {
+          newSides[itemId] = (newSides[itemId] || 0) + 1;
+        }
+        
+        return newSides;
+      });
+
+      if (isALaCarte) {
+        setSelectedEntrees({});
+      }
+    }
+  }
+
+/**
+ * Updates the quantity of a selected entree or side item based on the specified change.
+ * Increases or decreases the item quantity within the limits defined by the size configuration.
+ * If the quantity after change is zero, the item is removed from the selection.
+ * 
+ * @param {string} category - The category of the item, either 'side' or 'entree'.
+ * @param {number} itemId - The ID of the item whose quantity is to be changed.
+ * @param {number} change - The change in quantity (positive to increase, negative to decrease).
+ */
+  const handleQuantityChange = (category: 'side' | 'entree', itemId: number, change: number) => {
+    if (!currentOrder) return;
+    
+    const config = sizeConfig[currentOrder.size as keyof typeof sizeConfig];
+    
+    if (category === 'entree') {
+      setSelectedEntrees(prev => {
+        const newEntrees = { ...prev };
+        const currentQuantity = newEntrees[itemId] || 0;
+        const totalEntrees = Object.values(newEntrees).reduce((sum, qty) => sum + qty, 0);
+        
+        if (change > 0 &amp;&amp; totalEntrees &lt; config.entrees) {
+          newEntrees[itemId] = currentQuantity + 1;
+        } else if (change &lt; 0 &amp;&amp; currentQuantity > 0) {
+          newEntrees[itemId] = currentQuantity - 1;
+          if (newEntrees[itemId] === 0) {
+            delete newEntrees[itemId];
+          }
+        }
+        
+        return newEntrees;
+      });
+    } else {
+      setSelectedSides(prev => {
+        const newSides = { ...prev };
+        const currentQuantity = newSides[itemId] || 0;
+        const totalSides = Object.values(newSides).reduce((sum, qty) => sum + qty, 0);
+        
+        if (change > 0 &amp;&amp; totalSides &lt; config.sides) {
+          newSides[itemId] = currentQuantity + 1;
+        } else if (change &lt; 0 &amp;&amp; currentQuantity > 0) {
+          newSides[itemId] = currentQuantity - 1;
+          if (newSides[itemId] === 0) {
+            delete newSides[itemId];
+          }
+        }
+        
+        return newSides;
+      });
+    }
+  }
+
+  /**
+   * Determines if the current order is complete according to the size configuration.
+   * Returns true if all required entrees and sides have been selected, false otherwise.
+   * 
+   * For a la carte sizes (28, 29, 30), a single entree or side is required.
+   * For other sizes, the number of entrees and sides required is defined by the size configuration.
+   */
+  const isOrderComplete = () => {
+    if (!currentOrder) return false;
+    const config = sizeConfig[currentOrder.size as keyof typeof sizeConfig];
+
+    const totalEntreeQuantity = Object.values(selectedEntrees).reduce((sum, quantity) => sum + quantity, 0);
+    const totalSideQuantity = Object.values(selectedSides).reduce((sum, quantity) => sum + quantity, 0);
+
+    if ([28, 29, 30].includes(currentOrder.size)) {
+      return totalEntreeQuantity === 1 || totalSideQuantity === 1;
+    }
+
+    return totalEntreeQuantity === config.entrees &amp;&amp; totalSideQuantity === config.sides;
+  }
+
+/**
+ * Confirms the current order by finalizing the selected entrees and sides quantities.
+ * Updates the current order with the selected entree and side items according to their quantities.
+ * Resets the current order and selected items after adding the order to the list of order items
+ * and navigates back to the menu view.
+ * 
+ * This function is only executed if there is a current order and it is complete.
+ */
+  const handleConfirmOrder = () => {
+    if (currentOrder &amp;&amp; isOrderComplete()) {
+      const updatedOrder = { ...currentOrder, entreeQuantities: selectedEntrees, sideQuantities: selectedSides };
+
+      let entreeIndex = 0;
+      Object.entries(selectedEntrees).forEach(([id, quantity]) => {
+        for (let i = 0; i &lt; quantity; i++) {
+          (updatedOrder as any)[`entree_${entreeIndex}`] = parseInt(id);
+          entreeIndex++;
+        }
+      });
+
+      let sideIndex = 0;
+      Object.entries(selectedSides).forEach(([id, quantity]) => {
+        for (let i = 0; i &lt; quantity; i++) {
+          (updatedOrder as any)[`side_${sideIndex}`] = parseInt(id);
+          sideIndex++;
+        }
+      });
+
+      setOrderItems(prev => [...prev, updatedOrder]);
+      setCurrentOrder(null);
+      setView('menu');
+      setSelectedEntrees({});
+      setSelectedSides({});
+    }
+  }
+
+  /**
+   * Adds a new item to the order. Creates a new OrderItem based on the given MenuItem,
+   * and adds it to the list of order items.
+   * @param {MenuItem} item The item to add to the order.
+   */
+  const handleAddItem = (item: MenuItem) => {
+    const newItem: OrderItem = {
+      id: item.id,
+      size: item.id,
+      side_0: -1,
+      side_1: -1,
+      entree_0: -1,
+      entree_1: -1,
+      entree_2: -1,
+      price: parseFloat(item.price),
+      category: item.category,
+      name: item.name,
+      entreeQuantities: {},
+      sideQuantities: {},
+    }
+    setOrderItems(prev => [...prev, newItem])
+  }
+
+/**
+ * Removes an item from the list of order items by its index.
+ * Updates the state by filtering out the item located at the specified index.
+ * 
+ * @param {number} index - The index of the item to be removed from the order.
+ */
+  const deleteItem = (index: number) => {
+    setOrderItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  /**
+   * Clears the current order by resetting the state to an empty array.
+   * Called when the user wants to start a new order.
+   */
+  const clearAll = () => {
+    setOrderItems([])
+  }
+
+  /**
+   * Handles the checkout process for the current order.
+   * 
+   * Sends a POST request to the order API endpoint with the order details, including the employee ID, categorized
+   * order items, tax, and total amount.
+   * 
+   * On successful response, displays a success alert message with the order ID and clears
+   * the order items. Logs an error message if the checkout fails or if there is an error
+   * during the process.
+   * 
+   * @async
+   * @function
+   * @throws Will log an error message if the fetch request fails.
+   */
+  const handleCheckout = async () => {
+    if (orderItems.length === 0 || isCheckingOut) return
+
+    setIsCheckingOut(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employee_id: 0,
+          mains: orderItems.filter(item => item.category === 'meal_options').map(item => ({
+            id: item.id,
+            side_0: item.side_0,
+            side_1: item.side_1,
+            entree_0: item.entree_0,
+            entree_1: item.entree_1,
+            entree_2: item.entree_2,
+          })),
+          drinks: orderItems.filter(item => item.category === 'drinks').map(item => ({ id: item.id })),
+          more_choices: orderItems.filter(item => item.category === 'more_choices').map(item => ({ id: item.id })),
+          tax: (subtotal * TAX_RATE).toFixed(2),
+          total: (subtotal + subtotal * TAX_RATE).toFixed(2),
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setOrderConfirmation({ isOpen: true, orderId: data['order-id'] })
+        setOrderItems([])
+      } else {
+        console.error('Checkout failed')
+      }
+    } catch (error) {
+      console.error('Error during checkout:', error)
+    } finally {
+      setIsCheckingOut(false)
+    }
+  }
+
+  /**
+   * Retrieves the name of a menu item based on its ID.
+   * 
+   * Searches through the `menuData.menu_items` array to find an item
+   * with a matching ID. If an item is found, its name is returned.
+   * If no item is found, 'Not selected' is returned.
+   * 
+   * @param {number} id - The ID of the menu item to find.
+   * @returns {string} The name of the menu item, or 'Not selected' if not found.
+   */
+  const getItemName = (id: number) => {
+    const item = menuData.menu_items.find(item => item.id === id)
+    return item ? item.name : 'Not selected'
+  }
+
+  /**
+   * Retrieves a subtext string describing the contents of a meal option item.
+   * 
+   * If the item is a meal option, it will return a string listing the
+   * entrees and sides selected, separated by commas. If the item is not
+   * a meal option, it will return an empty string.
+   * 
+   * @param {OrderItem} order - The order item to generate a subtext for.
+   * @returns {string} A subtext string describing the contents of the meal option.
+   */
+  const getOrderSubtext = (order: OrderItem) => {
+    if (order.category === 'meal_options') {
+      let subtext = ''
+      Object.entries(order.entreeQuantities).forEach(([id, quantity]) => {
+        subtext += `${getItemName(parseInt(id))} x${quantity}, `
+      })
+      Object.entries(order.sideQuantities).forEach(([id, quantity]) => {
+        subtext += `${getItemName(parseInt(id))} x${quantity}, `
+      })
+      return subtext.slice(0, -2)
+    }
+    return ''
+  }
+
+  /**
+   * Resets the order confirmation state and navigates back to the kiosk page.
+   * 
+   * Called when the user clicks the "Done" button on the order confirmation dialog.
+   * Resets the `orderConfirmation` state to its initial values (isOpen = false, orderId = ''),
+   * and then navigates the user back to the kiosk page using the `router`.
+   */
+  const handleDoneOrdering = () => {
+    setOrderConfirmation({ isOpen: false, orderId: '' })
+    router.push('/kiosk')
+  }
+
+/**
+ * Navigates the user back to the kiosk page.
+ * 
+ * Called when the user chooses to cancel the current order,
+ * redirecting them away from the current view.
+ * 
+ * @function
+ * @name handleCancelOrder
+ * @returns {void}
+ */
+  const handleCancelOrder = () => {
+    router.push('/kiosk')
+  }
+
+  /**
+   * Toggles an allergen in the selected allergens list.
+   * 
+   * Called when the user checks or unchecks an allergen in the allergen filter.
+   * If the allergen is already selected, it is removed from the list.
+   * If the allergen is not selected, it is added to the list.
+   * 
+   * When an allergen is toggled, all previously selected entrees and sides are cleared.
+   * 
+   * @function
+   * @name handleAllergenChange
+   * @param {string} allergen The allergen to toggle in the list.
+   * @returns {void}
+   */
+  const handleAllergenChange = (allergen: string) => {
+    setSelectedAllergens(prev => {
+      if (prev.includes(allergen)) {
+        setSelectedEntrees({})
+        setSelectedSides({})
+        return prev.filter(a => a !== allergen)
+      } else {
+        setSelectedEntrees({})
+        setSelectedSides({})
+        return [...prev, allergen]
+      }
+    })
+  }
+
+  /**
+   * Filters a list of menu items to exclude any items which contain an allergen in the selected allergens list.
+   * 
+   * @param {MenuItem[]} items - The list of menu items to filter.
+   * @returns {MenuItem[]} The filtered list of menu items.
+   */
+  const filterMenuItems = (items: MenuItem[]) => {
+    return items.filter(item => 
+      !selectedAllergens.some(allergen => item.allergens.includes(allergen))
+    )
+  }
+
+  /**
+   * Toggles high contrast mode on and off.
+   * 
+   * High contrast mode is a special mode for visually impaired users.
+   * When high contrast mode is on, the colors of the UI are changed to be more readable.
+   * @function
+   * @name toggleHighContrast
+   * @returns {void}
+   */
+  const toggleHighContrast = () => {
+    setHighContrast(prev => !prev)
+  }
+
+  if (isTranslating || menuData.menu_items.length === 0) {
+    return (
+      &lt;div className="flex h-screen items-center justify-center">
+        &lt;Loader className="h-12 w-12 animate-spin text-primary" />
+      &lt;/div>
+    )
+  }
+
+  const subtotal = orderItems.reduce((sum, item) => sum + item.price, 0)
+  const tax = subtotal * TAX_RATE
+  const total = subtotal + tax
+
+  const sizeOptions = filterMenuItems(menuData.menu_items.filter(item => item.category === 'meal_options'))
+  const entrees = filterMenuItems(menuData.menu_items.filter(item => item.category === 'entrees'))
+  const sides = filterMenuItems(menuData.menu_items.filter(item => item.category === 'sides'))
+  const drinks = filterMenuItems(menuData.menu_items.filter(item => item.category === 'drinks'))
+  const moreChoices = filterMenuItems(menuData.menu_items.filter(item => item.category === 'more_choices'))
+
+  const totalSelectedEntrees = Object.values(selectedEntrees).reduce((sum, qty) => sum + qty, 0)
+  const totalSelectedSides = Object.values(selectedSides).reduce((sum, qty) => sum + qty, 0)
+  const maxEntrees = currentOrder ? sizeConfig[currentOrder.size as keyof typeof sizeConfig].entrees : 0
+  const maxSides = currentOrder ? sizeConfig[currentOrder.size as keyof typeof sizeConfig].sides : 0
+
+  return (
+    &lt;div className={`flex h-screen flex-col ${highContrast ? 'bg-black text-white' : 'bg-background'}`}>
+      &lt;header className={`border-b ${highContrast ? 'bg-white text-black' : 'bg-[#D02B28]'}`}>
+        &lt;div className="flex h-16 items-center justify-between px-4">
+          &lt;h1 className={`text-2xl font-bold ${highContrast ? 'text-black' : 'text-white'}`}>Panda Express&lt;/h1>
+          &lt;div className="flex items-center">
+            &lt;div className="flex items-center mr-4">
+              &lt;Switch
+                checked={highContrast}
+                onCheckedChange={toggleHighContrast}
+                aria-label="Toggle high contrast mode"
+              />
+              &lt;Label htmlFor="high-contrast-mode" className="ml-2">
+                {highContrast ? &lt;Moon className="h-4 w-4" /> : &lt;Sun className="h-6 w-6 text-white" />}
+              &lt;/Label>
+            &lt;/div>
+            &lt;Button 
+              variant={highContrast ? "outline" : "secondary"} 
+              onClick={() => setIsAllergenDialogOpen(true)} 
+              className={`${highContrast ? 'text-black border-black' : 'text-black'} mr-4`}
+            >
+              {translate('Food Allergies? Click here to filter.')}
+            &lt;/Button>
+            &lt;Button 
+              variant={highContrast ? "outline" : "ghost"} 
+              onClick={handleCancelOrder} 
+              className={highContrast ? 'text-black border-black' : 'text-white'}
+            >
+              &lt;X className="mr-2 h-4 w-4" />
+              {translate('Cancel Order')}
+            &lt;/Button>
+          &lt;/div>
+        &lt;/div>
+      &lt;/header>
+
+      &lt;div className="flex flex-1 overflow-hidden">
+        {/* Left Pane - Menu Options or Customization */}
+        &lt;div className={`flex-1 overflow-hidden border-r ${highContrast ? 'border-white' : ''}`}>
+          &lt;ScrollArea className="h-full">
+            {view === 'menu' ? (
+              &lt;div className="p-6">
+                &lt;h2 className={`text-2xl font-bold mb-6 ${highContrast ? 'text-white' : ''}`}>{translate('Select Your Meal')}&lt;/h2>
+                &lt;div className="grid lg:grid-cols-4 md:grid-cols-3 gap-6">
+                  {sizeOptions.map((item) => (
+                    &lt;Card
+                      key={item.id}
+                      className={`overflow-hidden cursor-pointer ${
+                        highContrast 
+                          ? 'bg-white text-black hover:bg-gray-200' 
+                          : 'hover:bg-accent'
+                      } transition-colors`}
+                      onClick={() => handleSizeClick(item.id, parseFloat(item.price))}
+                    >
+                      &lt;CardContent className="p-0">
+                        &lt;div className="aspect-video relative">
+                          &lt;Image
+                            src={item.image}
+                            alt={translate(item.name)}
+                            fill
+                            className="object-cover"
+                          />
+                        &lt;/div>
+                        &lt;div className="p-4">
+                          &lt;h3 className="font-bold text-lg">{translate(item.name)}&lt;/h3>
+                          &lt;p className={`text-sm ${highContrast ? 'text-gray-800' : 'text-muted-foreground'}`}>{translate(item.description || '')}&lt;/p>
+                          &lt;p className="mt-2 font-bold">${item.price}&lt;/p>
+                        &lt;/div>
+                      &lt;/CardContent>
+                    &lt;/Card>
+                  ))}
+                &lt;/div>
+                &lt;h2 className={`text-2xl font-bold my-6 ${highContrast ? 'text-white' : ''}`}>{translate('Drinks')}&lt;/h2>
+                &lt;div className="grid lg:grid-cols-5 md:grid-cols-3 gap-6">
+                  {drinks.map((item) => (
+                    &lt;Card
+                      key={item.id}
+                      className={`overflow-hidden cursor-pointer ${
+                        highContrast 
+                          ? 'bg-white text-black hover:bg-gray-200' 
+                          : 'hover:bg-accent'
+                      } transition-colors`}
+                      onClick={() => handleAddItem(item)}
+                    >
+                      &lt;CardContent className="p-0">
+                        &lt;div className="aspect-video relative">
+                          &lt;Image
+                            src={item.image}
+                            alt={translate(item.name)}
+                            fill
+                            className="object-cover"
+                          />
+                        &lt;/div>
+                        &lt;div className="p-4">
+                          &lt;h3 className="font-bold">{translate(item.name)}&lt;/h3>
+                          &lt;p className={`text-sm ${highContrast ? 'text-gray-800' : 'text-muted-foreground'}`}>{translate(item.description || '')}&lt;/p>
+                          &lt;p className="mt-2 font-bold">${item.price}&lt;/p>
+                        &lt;/div>
+                      &lt;/CardContent>
+                    &lt;/Card>
+                  ))}
+                &lt;/div>
+                &lt;h2 className={`text-2xl font-bold my-6 ${highContrast ? 'text-white' : ''}`}>{translate('More Choices')}&lt;/h2>
+                &lt;div className="grid lg:grid-cols-4 md:grid-cols-2 gap-6">
+                  {moreChoices.map((item) => (
+                    &lt;Card
+                      key={item.id}
+                      className={`overflow-hidden cursor-pointer ${
+                        highContrast 
+                          ? 'bg-white text-black hover:bg-gray-200' 
+                          : 'hover:bg-accent'
+                      } transition-colors`}
+                      onClick={() => handleAddItem(item)}
+                    >
+                      &lt;CardContent className="p-0">
+                        &lt;div className="aspect-video relative">
+                          &lt;Image
+                            src={item.image}
+                            alt={translate(item.name)}
+                            fill
+                            className="object-cover"
+                          />
+                        &lt;/div>
+                        &lt;div className="p-4">
+                          &lt;h3 className="font-bold">{translate(item.name)}&lt;/h3>
+                          &lt;p className={`text-sm ${highContrast ? 'text-gray-800' : 'text-muted-foreground'}`}>{translate(item.description || '')}&lt;/p>
+                          &lt;p className="mt-2 font-bold">${item.price}&lt;/p>
+                        &lt;/div>
+                      &lt;/CardContent>
+                    &lt;/Card>
+                  ))}
+                &lt;/div>
+              &lt;/div>
+            ) : (
+              &lt;div className="p-6">
+                &lt;div className="flex items-center gap-4 mb-6">
+                  &lt;Button variant="ghost" size="icon" onClick={handleBackToMenu}>
+                    &lt;ArrowLeft className="h-4 w-4" />
+                  &lt;/Button>
+                  &lt;h2 className={`text-2xl font-bold ${highContrast ? 'text-white' : ''}`}>{translate('Customize Your Meal')}&lt;/h2>
+                &lt;/div>
+                &lt;div className="space-y-8">
+                  &lt;div>
+                    &lt;h3 className={`text-lg font-semibold mb-4 ${highContrast ? 'text-white' : ''}`}>
+                      {translate('Entree(s)')} - {translate('select')} {maxEntrees}
+                    &lt;/h3>
+                    &lt;div className="grid lg:grid-cols-5 md:grid-cols-3 grid-cols-2 gap-4">
+                      {entrees.map((entree) => (
+                        &lt;Card
+                          key={entree.id}
+                          className={`overflow-hidden cursor-pointer transition-colors ${
+                            entree.id in selectedEntrees ? 'ring-2 ring-primary' : (highContrast ? 'bg-white text-black hover:bg-gray-200' : 'hover:bg-accent')
+                          } ${
+                            totalSelectedEntrees >= maxEntrees &amp;&amp; !(entree.id in selectedEntrees)
+                              ? 'opacity-50 pointer-events-none'
+                              : ''
+                          }`}
+                          onClick={() => handleItemSelection('entree', entree.id)}
+                        >
+                          &lt;CardContent className="p-2">
+                            &lt;div className="aspect-video relative mb-2">
+                              &lt;Image
+                                src={entree.image}
+                                alt={translate(entree.name)}
+                                fill
+                                className="object-cover rounded"
+                              />
+                            &lt;/div>
+                            &lt;h4 className={`font-medium text-sm text-center ${highContrast ? 'text-black' : ''}`}>{translate(entree.name)}&lt;/h4>
+                            &lt;p className={`text-xs text-center ${highContrast ? 'text-gray-800' : 'text-muted-foreground'}`}>{translate(entree.description || '')}&lt;/p>
+                            {entree.id in selectedEntrees &amp;&amp; (
+                              &lt;div className="flex justify-between items-center mt-2">
+                                &lt;Button
+                                  size="sm"
+                                  variant={highContrast ? "outline" : "outline"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuantityChange('entree', entree.id, -1);
+                                  }}
+                                >
+                                  &lt;Minus className="h-4 w-4" />
+                                &lt;/Button>
+                                &lt;span>{selectedEntrees[entree.id]}&lt;/span>
+                                &lt;Button
+                                  size="sm"
+                                  variant={highContrast ? "outline" : "outline"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuantityChange('entree', entree.id, 1);
+                                  }}
+                                  disabled={totalSelectedEntrees >= maxEntrees}
+                                >
+                                  &lt;Plus className="h-4 w-4" />
+                                &lt;/Button>
+                              &lt;/div>
+                            )}
+                          &lt;/CardContent>
+                        &lt;/Card>
+                      ))}
+                    &lt;/div>
+                  &lt;/div>
+                  &lt;div>
+                    &lt;h3 className={`text-lg font-semibold mb-4 ${highContrast ? 'text-white' : ''}`}>
+                      {translate('Side(s)')} - {translate('select')} {maxSides}
+                    &lt;/h3>
+                    &lt;div className="grid lg:grid-cols-4 md:grid-cols-3 grid-cols-2 gap-4">
+                      {sides.map((side) => (
+                        &lt;Card
+                          key={side.id}
+                          className={`overflow-hidden cursor-pointer transition-colors ${
+                            side.id in selectedSides ? 'ring-2 ring-primary' : (highContrast ? 'bg-white text-black hover:bg-gray-200' : 'hover:bg-accent')
+                          } ${
+                            totalSelectedSides >= maxSides &amp;&amp; !(side.id in selectedSides)
+                              ? 'opacity-50 pointer-events-none'
+                              : ''
+                          }`}
+                          onClick={() => handleItemSelection('side', side.id)}
+                        >
+                          &lt;CardContent className="p-2">
+                            &lt;div className="aspect-video relative mb-2">
+                              &lt;Image
+                                src={side.image}
+                                alt={translate(side.name)}
+                                fill
+                                className="object-cover rounded"
+                              />
+                            &lt;/div>
+                            &lt;h4 className={`font-medium text-sm text-center ${highContrast ? 'text-black' : ''}`}>{translate(side.name)}&lt;/h4>
+                            &lt;p className={`text-xs text-center ${highContrast ? 'text-gray-800' : 'text-muted-foreground'}`}>{translate(side.description || '')}&lt;/p>
+                            {side.id in selectedSides &amp;&amp; (
+                              &lt;div className="flex justify-between items-center mt-2">
+                                &lt;Button
+                                  size="sm"
+                                  variant={highContrast ? "outline" : "outline"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuantityChange('side', side.id, -1);
+                                  }}
+                                >
+                                  &lt;Minus className="h-4 w-4" />
+                                &lt;/Button>
+                                &lt;span>{selectedSides[side.id]}&lt;/span>
+                                &lt;Button
+                                  size="sm"
+                                  variant={highContrast ? "outline" : "outline"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuantityChange('side', side.id, 1);
+                                  }}
+                                  disabled={totalSelectedSides >= maxSides}
+                                >
+                                  &lt;Plus className="h-4 w-4" />
+                                &lt;/Button>
+                              &lt;/div>
+                            )}
+                          &lt;/CardContent>
+                        &lt;/Card>
+                      ))}
+                    &lt;/div>
+                  &lt;/div>
+
+                  &lt;div className="flex justify-end">
+                    &lt;Button
+                      size="lg"
+                      onClick={handleConfirmOrder}
+                      disabled={!isOrderComplete()}
+                    >
+                      {translate('Add to Order')}
+                    &lt;/Button>
+                  &lt;/div>
+                &lt;/div>
+              &lt;/div>
+            )}
+          &lt;/ScrollArea>
+        &lt;/div>
+        {/* Right Pane - Order Summary */}
+        &lt;div className={`lg:w-[400px] md:w-[300px] w-[200px] flex flex-col ${highContrast ? 'bg-white text-black' : ''}`}>
+          &lt;ScrollArea className="flex-1">
+            &lt;div className="p-4">
+              &lt;h2 className={`text-xl font-bold mb-4 ${highContrast ? 'text-black' : ''}`}>{translate('Your Order')}&lt;/h2>
+              &lt;Table>
+                &lt;TableHeader>
+                  &lt;TableRow>
+                    &lt;TableHead>{translate('Item')}&lt;/TableHead>
+                    &lt;TableHead className="w-[80px] text-right">{translate('Price')}&lt;/TableHead>
+                    &lt;TableHead className="w-[50px]">&lt;/TableHead>
+                  &lt;/TableRow>
+                &lt;/TableHeader>
+                &lt;TableBody>
+                  {orderItems.map((item, index) => (
+                    &lt;TableRow key={index}>
+                      &lt;TableCell>
+                        &lt;div>{translate(item.name)}&lt;/div>
+                        &lt;div className={`text-sm ${highContrast ? 'text-gray-800' : 'text-gray-500'} hidden sm:block`}>{translate(getOrderSubtext(item))}&lt;/div>
+                      &lt;/TableCell>
+                      &lt;TableCell className="text-right">${item.price.toFixed(2)}&lt;/TableCell>
+                      &lt;TableCell>
+                        &lt;Button
+                          variant={highContrast ? "outline" : "ghost"}
+                          size="icon"
+                          onClick={() => deleteItem(index)}
+                        >
+                          &lt;Trash2 className="h-4 w-4" />
+                        &lt;/Button>
+                      &lt;/TableCell>
+                    &lt;/TableRow>
+                  ))}
+                &lt;/TableBody>
+              &lt;/Table>
+            &lt;/div>
+          &lt;/ScrollArea>
+          &lt;div className={`border-t p-4 ${highContrast ? 'border-black' : ''}`}>
+            &lt;div className="space-y-2 mb-4">
+              &lt;div className="flex justify-between items-center">
+                &lt;span>{translate('Subtotal:')}&lt;/span>
+                &lt;span>${subtotal.toFixed(2)}&lt;/span>
+              &lt;/div>
+              &lt;div className="flex justify-between items-center">
+                &lt;span>{translate('Tax:')}&lt;/span>
+                &lt;span>${tax.toFixed(2)}&lt;/span>
+              &lt;/div>
+              &lt;div className="flex justify-between items-center font-bold">
+                &lt;span>{translate('Total:')}&lt;/span>
+                &lt;span>${total.toFixed(2)}&lt;/span>
+              &lt;/div>
+            &lt;/div>
+            &lt;div className="grid grid-cols-2 gap-2">
+              &lt;Button
+                className={`w-full ${highContrast ? 'bg-black text-white hover:bg-gray-800' : 'bg-green-500 hover:bg-green-600'}`}
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
+              >
+                {isCheckingOut ? 'Processing...' : translate('Checkout')}
+              &lt;/Button>
+              &lt;Button 
+                className={`w-full ${highContrast ? 'border-black text-black hover:bg-gray-200' : ''}`}
+                variant={highContrast ? "outline" : "destructive"}
+                onClick={clearAll}
+              >
+                {translate('Clear All')}
+              &lt;/Button>
+            &lt;/div>
+          &lt;/div>
+        &lt;/div>
+        &lt;Dialog open={orderConfirmation.isOpen} onOpenChange={handleDoneOrdering}>
+          &lt;DialogContent className={highContrast ? 'bg-white text-black' : ''}>
+            &lt;DialogHeader>
+              &lt;div className="text-center">
+                &lt;DialogTitle>{translate('Thank you for your order!')}&lt;/DialogTitle>
+              &lt;/div>
+            &lt;/DialogHeader>
+            &lt;div className="py-4 text-center">
+              &lt;p>{translate('Your order number is')} {orderConfirmation.orderId}&lt;br/>&lt;br/>&lt;/p>
+              &lt;Button 
+                onClick={handleDoneOrdering}
+                className={highContrast ? 'bg-black text-white hover:bg-gray-800' : ''}
+              >
+                {translate('Done ordering')}
+              &lt;/Button>
+            &lt;/div>
+          &lt;/DialogContent>
+        &lt;/Dialog>
+        &lt;Dialog open={isAllergenDialogOpen} onOpenChange={setIsAllergenDialogOpen}>
+          &lt;DialogContent className={highContrast ? 'bg-white text-black' : ''}>
+            &lt;DialogHeader>
+              &lt;DialogTitle>{translate('Select Your Allergens')}&lt;/DialogTitle>
+            &lt;/DialogHeader>
+            &lt;div className="grid grid-cols-2 gap-4">
+              {allergens.map((allergen) => (
+                &lt;div key={allergen} className="flex items-center space-x-2">
+                  &lt;Checkbox
+                    id={`allergen-${allergen}`}
+                    checked={selectedAllergens.includes(allergen)}
+                    onCheckedChange={() => handleAllergenChange(allergen)}
+                  />
+                  &lt;Label htmlFor={`allergen-${allergen}`}>{translate(allergen)}&lt;/Label>
+                &lt;/div>
+              ))}
+            &lt;/div>
+            &lt;Button 
+              onClick={() => setIsAllergenDialogOpen(false)}
+              className={highContrast ? 'bg-black text-white hover:bg-gray-800' : ''}
+            >
+              {translate('Apply')}
+            &lt;/Button>
+          &lt;/DialogContent>
+        &lt;/Dialog>
+      &lt;/div>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

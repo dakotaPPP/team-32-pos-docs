@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: manager-view.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: manager-view.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { LogoutButton } from "@/components/ui/logout-button"
+import {
+  BarChart,
+  Users,
+  Soup,
+  LeafyGreen,
+} from "lucide-react"
+
+interface SidebarProps extends React.HTMLAttributes&lt;HTMLDivElement> {
+  activeView: string
+  setActiveView: (view: string) => void
+}
+
+/**
+ * A sidebar component for the manager view.
+ *
+ * This component displays a list of buttons for each of the manager views. The
+ * button for the currently active view is highlighted. The component also
+ * displays a logout button at the bottom.
+ *
+ * @param className - The CSS class to apply to the root element of the component.
+ * @param activeView - The currently active view.
+ * @param setActiveView - A function to set the active view.
+ */
+export function Sidebar({ className, activeView, setActiveView }: SidebarProps) {
+  return (
+    &lt;div className={cn("pb-12 w-64 bg-white", className)}>
+      &lt;div className="space-y-4 py-4">
+        &lt;div className="px-3 py-2">
+          &lt;h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+            Manager Dashboard
+          &lt;/h2>
+          &lt;div className="space-y-1">
+            &lt;Button
+              variant={activeView === "Reports" ? "default" : "ghost"}
+              className="w-full justify-start py-6"
+              onClick={() => setActiveView("Reports")}
+            >
+              &lt;BarChart className="mr-2 h-4 w-4" />
+              Reports
+            &lt;/Button>
+            &lt;Button
+              variant={activeView === "Employees" ? "default" : "ghost"}
+              className="w-full justify-start py-6"
+              onClick={() => setActiveView("Employees")}
+            >
+              &lt;Users className="mr-2 h-4 w-4" />
+              Employees
+            &lt;/Button>
+            &lt;Button
+              variant={activeView === "Menu Items" ? "default" : "ghost"}
+              className="w-full justify-start py-6"
+              onClick={() => setActiveView("Menu Items")}
+            >
+              &lt;Soup className="mr-2 h-4 w-4" />
+              Menu Items
+            &lt;/Button>
+            &lt;Button
+              variant={activeView === "Ingredients" ? "default" : "ghost"}
+              className="w-full justify-start py-6"
+              onClick={() => setActiveView("Ingredients")}
+            >
+              &lt;LeafyGreen className="mr-2 h-4 w-4" />
+              Ingredients
+            &lt;/Button>
+          &lt;/div>
+        &lt;/div>
+      &lt;/div>
+      &lt;div className="px-3 py-2">
+        &lt;LogoutButton className="w-full justify-start" />
+      &lt;/div>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: ingredients.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: ingredients.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { useState, useEffect } from 'react'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { AlertCircle, ArrowUpDown, Loader } from 'lucide-react'
+
+/**
+ * @typedef Ingredient
+ * @property {number} id
+ * @property {string} name
+ * @property {number} quantity
+ * @property {number} price
+ * @property {number} threshold
+ */
+interface Ingredient {
+  id: number
+  name: string
+  quantity: number
+  price: number
+  threshold: number
+}
+
+/**
+ * @typedef ColumnData
+ * @property {Ingredient | 'restock'} column
+ * @property {'asc' | 'desc'} direction
+*/
+interface ColumnData {
+  column: keyof Ingredient | 'restock'
+  direction: 'asc' | 'desc'
+}
+
+/**
+ * The Ingredients component manages and displays a list of ingredients.
+ * It allows users to add, update, delete, and sort ingredients.
+ * The component fetches ingredient data from an API and manages
+ * the editing state for adding or updating ingredients.
+ * 
+ * Features:
+ * - Fetches ingredients from an API and displays them in a table.
+ * - Allows sorting by various fields (ID, name, quantity, price, threshold, restock).
+ * - Provides a dialog for adding or editing ingredients with fields for 
+ *   name, quantity, price, and threshold.
+ * - Handles adding, updating, and deleting ingredients via API calls.
+ * - Displays toast notifications for success or error scenarios.
+ * - Highlights ingredients that need restocking based on their threshold.
+ */
+export function Ingredients() {
+  const [ingredients, setIngredients] = useState&lt;Ingredient[]>([])
+  const [editingIngredient, setEditingIngredient] = useState&lt;Ingredient | null>(null)
+  const [sortColumn, setSortColumn] = useState&lt;keyof Ingredient | 'restock'>('name')
+  const [sortDirection, setSortDirection] = useState&lt;'asc' | 'desc'>('asc')
+  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchIngredients()
+  }, [])
+
+/**
+ * Fetches the list of ingredients from the API.
+ * 
+ * @async
+ * @function
+ * @name fetchIngredients
+ * @returns {Promise&lt;void>}
+ * @throws Will log an error message if the fetch fails.
+ */
+  const fetchIngredients = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingredients`)
+      if (response.ok) {
+        const data = await response.json()
+        setIngredients(data)
+      }
+    } catch (error) {
+      console.error('Error fetching ingredients:', error)
+    }
+  }
+
+/**
+ * Adds a new ingredient by sending a POST request to the API.
+ * 
+ * Uses the current `editingIngredient` state to create the ingredient.
+ * On success, fetches the updated list of ingredients and resets the `editingIngredient` state.
+ * Displays a success toast notification if the ingredient is added successfully.
+ * Logs and displays an error toast notification if the API request fails.
+ * 
+ * @async
+ * @function
+ * @throws Will log an error message and display a toast notification if the fetch fails.
+ */
+  const handleAddIngredient = async () => {
+    if (!editingIngredient) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingIngredient),
+      })
+      if (response.ok) {
+        fetchIngredients()
+        setEditingIngredient(null)
+        toast({
+          title: "Success",
+          description: "Ingredient added successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error adding ingredient:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add ingredient",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Updates an existing ingredient by sending a PUT request to the API.
+   * 
+   * Uses the current `editingIngredient` state to update the ingredient.
+   * On success, fetches the updated list of ingredients and resets the `editingIngredient` state.
+   * Displays a success toast notification if the ingredient is updated successfully.
+   * Logs and displays an error toast notification if the API request fails.
+   * 
+   * @async
+   * @function
+   * @throws Will log an error message and display a toast notification if the fetch fails.
+   */
+  const handleUpdateIngredient = async () => {
+    if (!editingIngredient) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingredients`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingIngredient),
+      })
+      if (response.ok) {
+        fetchIngredients()
+        setEditingIngredient(null)
+        toast({
+          title: "Success",
+          description: "Ingredient updated successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error updating ingredient:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update ingredient",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Deletes an existing ingredient by sending a DELETE request to the API.
+   * 
+   * Uses the current `editingIngredient` state to determine the ingredient to delete.
+   * On success, fetches the updated list of ingredients and resets the `editingIngredient` state.
+   * Displays a success toast notification if the ingredient is deleted successfully.
+   * Logs and displays an error toast notification if the API request fails.
+   * 
+   * @async
+   * @function
+   * @throws Will log an error message and display a toast notification if the fetch fails.
+   */
+  const handleDeleteIngredient = async () => {
+    if (!editingIngredient) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingredients/${editingIngredient.id}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        fetchIngredients()
+        setEditingIngredient(null)
+        toast({
+          title: "Success",
+          description: "Ingredient deleted successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting ingredient:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete ingredient",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Handles sorting of the ingredient list.
+   * 
+   * If the column is the same as the current `sortColumn`, it toggles the `sortDirection` between 'asc' and 'desc'.
+   * If the column is different, it sets `sortColumn` and `sortDirection` to the given column and 'asc', respectively.
+   * 
+   * @param {ColumnData} column - The column to sort by.
+   * @returns {void}
+   */
+  const handleSort = (column: keyof Ingredient | 'restock') => {
+    if (column === sortColumn) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedIngredients = [...ingredients].sort((a, b) => {
+    if (sortColumn === 'restock') {
+      const aRestock = a.quantity &lt; a.threshold
+      const bRestock = b.quantity &lt; b.threshold
+      return sortDirection === 'asc' 
+        ? (aRestock === bRestock ? 0 : aRestock ? -1 : 1)
+        : (aRestock === bRestock ? 0 : aRestock ? 1 : -1)
+    }
+    
+    if (a[sortColumn] &lt; b[sortColumn]) return sortDirection === 'asc' ? -1 : 1
+    if (a[sortColumn] > b[sortColumn]) return sortDirection === 'asc' ? 1 : -1
+    return 0
+  })
+
+  if (ingredients.length === 0) {
+    return (
+      &lt;div className="flex h-screen items-center justify-center">
+        &lt;Loader className="h-12 w-12 animate-spin text-primary" />
+      &lt;/div>
+    )
+  }
+
+  return (
+    &lt;div className="space-y-4">
+      &lt;Dialog open={!!editingIngredient} onOpenChange={(open) => {
+        if (open) setEditingIngredient({ id: 0, name: '', quantity: 0, price: 0, threshold: 0 })
+        else setEditingIngredient(null)
+      }}>
+        &lt;DialogTrigger asChild>
+          &lt;Button>Add Ingredient&lt;/Button>
+        &lt;/DialogTrigger>
+        &lt;DialogContent>
+          &lt;DialogHeader>
+            &lt;DialogTitle>{editingIngredient?.id ? 'Edit Ingredient' : 'Add New Ingredient'}&lt;/DialogTitle>
+          &lt;/DialogHeader>
+          {editingIngredient &amp;&amp; (
+            &lt;div className="space-y-4">
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="name">Name&lt;/Label>
+                &lt;Input
+                  id="name"
+                  value={editingIngredient.name}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, name: e.target.value })}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="quantity">Quantity&lt;/Label>
+                &lt;Input
+                  id="quantity"
+                  type="number"
+                  value={editingIngredient.quantity}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, quantity: parseInt(e.target.value) })}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="price">Price&lt;/Label>
+                &lt;Input
+                  id="price"
+                  type="number"
+                  value={editingIngredient.price}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, price: parseFloat(e.target.value) })}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="threshold">Threshold&lt;/Label>
+                &lt;Input
+                  id="threshold"
+                  type="number"
+                  value={editingIngredient.threshold}
+                  onChange={(e) => setEditingIngredient({ ...editingIngredient, threshold: parseInt(e.target.value) })}
+                />
+              &lt;/div>
+              &lt;DialogFooter>
+                &lt;Button onClick={editingIngredient.id ? handleUpdateIngredient : handleAddIngredient} className="bg-green-500 hover:bg-green-600">
+                  {editingIngredient.id ? 'Update Ingredient' : 'Add Ingredient'}
+                &lt;/Button>
+                {editingIngredient.id !== 0 &amp;&amp; (
+                  &lt;AlertDialog>
+                    &lt;AlertDialogTrigger asChild>
+                      &lt;Button variant="destructive">Delete Ingredient&lt;/Button>
+                    &lt;/AlertDialogTrigger>
+                    &lt;AlertDialogContent>
+                      &lt;AlertDialogHeader>
+                        &lt;AlertDialogTitle>Are you sure?&lt;/AlertDialogTitle>
+                        &lt;AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the ingredient.
+                        &lt;/AlertDialogDescription>
+                      &lt;/AlertDialogHeader>
+                      &lt;AlertDialogFooter>
+                        &lt;AlertDialogCancel>Cancel&lt;/AlertDialogCancel>
+                        &lt;AlertDialogAction onClick={handleDeleteIngredient}>Delete&lt;/AlertDialogAction>
+                      &lt;/AlertDialogFooter>
+                    &lt;/AlertDialogContent>
+                  &lt;/AlertDialog>
+                )}
+              &lt;/DialogFooter>
+            &lt;/div>
+          )}
+        &lt;/DialogContent>
+      &lt;/Dialog>
+      &lt;Table>
+        &lt;TableHeader>
+          &lt;TableRow>
+            &lt;TableHead className="cursor-pointer" onClick={() => handleSort('id')}>
+              ID &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+            &lt;/TableHead>
+            &lt;TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
+              Name &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+            &lt;/TableHead>
+            &lt;TableHead className="cursor-pointer" onClick={() => handleSort('quantity')}>
+              Quantity &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+            &lt;/TableHead>
+            &lt;TableHead className="cursor-pointer" onClick={() => handleSort('price')}>
+              Price &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+            &lt;/TableHead>
+            &lt;TableHead className="cursor-pointer" onClick={() => handleSort('threshold')}>
+              Threshold &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+            &lt;/TableHead>
+            &lt;TableHead className="cursor-pointer" onClick={() => handleSort('restock')}>
+              Restock &lt;ArrowUpDown className="inline ml-2 h-4 w-4" />
+            &lt;/TableHead>
+            &lt;TableHead>Actions&lt;/TableHead>
+          &lt;/TableRow>
+        &lt;/TableHeader>
+        &lt;TableBody>
+          {sortedIngredients.map((ingredient) => (
+            &lt;TableRow key={ingredient.id}>
+              &lt;TableCell>{ingredient.id}&lt;/TableCell>
+              &lt;TableCell>{ingredient.name}&lt;/TableCell>
+              &lt;TableCell>{ingredient.quantity}&lt;/TableCell>
+              &lt;TableCell>${Number(ingredient.price).toFixed(2)}&lt;/TableCell>
+              &lt;TableCell>{ingredient.threshold}&lt;/TableCell>
+              &lt;TableCell>
+                {ingredient.quantity &lt; ingredient.threshold &amp;&amp; (
+                  &lt;AlertCircle className="text-red-500 h-5 w-5" />
+                )}
+              &lt;/TableCell>
+              &lt;TableCell>
+                &lt;Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingIngredient(ingredient)}
+                >
+                  Edit
+                &lt;/Button>
+              &lt;/TableCell>
+            &lt;/TableRow>
+          ))}
+        &lt;/TableBody>
+      &lt;/Table>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

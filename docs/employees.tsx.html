@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: employees.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: employees.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { useState, useEffect } from 'react'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader } from "lucide-react"
+
+interface Employee {
+  id: number
+  name: string
+  role: string
+  wage: number
+  active: boolean
+  password?: string
+  email?: string
+}
+
+/**
+ * @typedef {Object} Employee
+ * @property {number} id - The unique identifier of the employee.
+ * @property {string} name - The name of the employee.
+ * @property {string} role - The role of the employee (e.g., cashier, manager).
+ * @property {number} wage - The wage of the employee.
+ * @property {boolean} active - The active status of the employee.
+ * @property {string} [email] - The email of the employee (required for managers).
+ * @property {string} [password] - The password of the employee (required for non-managers).
+*/
+
+/**
+ * @component
+ * The Employees component is responsible for managing and displaying a list of employees.
+ * It allows for adding, updating, and deleting employees through a dialog interface.
+ * @returns {JSX.Element} The rendered component.
+ * @remarks
+ * This component fetches the list of employees from an API on mount and displays them in a table.
+ * It also provides a dialog for adding or editing an employee, and an alert dialog for confirming deletion.
+ */
+export function Employees() {
+  const [employees, setEmployees] = useState&lt;Employee[]>([])
+  const [editingEmployee, setEditingEmployee] = useState&lt;Employee | null>(null)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchEmployees()
+  }, [])
+
+  /**
+   * Fetches the list of employees from the API.
+   * 
+   * @async
+   * @function
+   * @name fetchEmployees
+   * @returns {Promise&lt;void>}
+   */
+  const fetchEmployees = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/employees`)
+      if (response.ok) {
+        const data = await response.json()
+        setEmployees(data)
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+    }
+  }
+
+  /**
+   * Adds a new employee by sending a POST request to the API.
+   * 
+   * @async
+   * @function
+   * @throws Will log an error message if the fetch fails.
+   */
+  const handleAddEmployee = async () => {
+    if (!editingEmployee) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingEmployee),
+      })
+      if (response.ok) {
+        fetchEmployees()
+        setEditingEmployee(null)
+        toast({
+          title: "Success",
+          description: "Employee added successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error adding employee:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add employee",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Updates an existing employee by sending a PUT request to the API.
+   * 
+   * @async
+   * @function
+   * @throws Will log an error message if the fetch fails.
+   */
+  const handleUpdateEmployee = async () => {
+    if (!editingEmployee) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/employees/${editingEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingEmployee),
+      })
+      if (response.ok) {
+        fetchEmployees()
+        setEditingEmployee(null)
+        toast({
+          title: "Success",
+          description: "Employee updated successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error updating employee:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update employee",
+        variant: "destructive",
+      })
+    }
+  }
+
+  /**
+   * Deletes an existing employee by sending a DELETE request to the API.
+   * 
+   * @async
+   * @function
+   * @throws Will log an error message if the fetch fails.
+   */
+  const handleDeleteEmployee = async () => {
+    if (!editingEmployee) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/employees/${editingEmployee.id}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        fetchEmployees()
+        setEditingEmployee(null)
+        toast({
+          title: "Success",
+          description: "Employee deleted successfully",
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting employee:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete employee",
+        variant: "destructive",
+      })
+    }
+  }
+
+
+  if (employees.length === 0) {
+    return (
+      &lt;div className="flex h-screen items-center justify-center">
+        &lt;Loader className="h-12 w-12 animate-spin text-primary" />
+      &lt;/div>
+    )
+  }
+
+  return (
+    &lt;div className="space-y-4">
+      &lt;Dialog open={!!editingEmployee} onOpenChange={(open) => {
+        if (open) setEditingEmployee({ id: 0, name: '', role: '', wage: 0, active: true })
+        else setEditingEmployee(null)
+      }}>
+        &lt;DialogTrigger asChild>
+          &lt;Button>Add Employee&lt;/Button>
+        &lt;/DialogTrigger>
+        &lt;DialogContent>
+          &lt;DialogHeader>
+            &lt;DialogTitle>{editingEmployee?.id ? 'Edit Employee' : 'Add New Employee'}&lt;/DialogTitle>
+          &lt;/DialogHeader>
+          {editingEmployee &amp;&amp; (
+            &lt;div className="space-y-4">
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="name">Name&lt;/Label>
+                &lt;Input
+                  id="name"
+                  value={editingEmployee.name}
+                  onChange={(e) => setEditingEmployee({ ...editingEmployee, name: e.target.value })}
+                />
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="role">Role&lt;/Label>
+                &lt;Select
+                  value={editingEmployee.role}
+                  onValueChange={(value) => setEditingEmployee({ ...editingEmployee, role: value, password: undefined, email: undefined })}
+                >
+                  &lt;SelectTrigger id="role">
+                    &lt;SelectValue placeholder="Select a role" />
+                  &lt;/SelectTrigger>
+                  &lt;SelectContent>
+                    &lt;SelectItem value="cashier">Cashier&lt;/SelectItem>
+                    &lt;SelectItem value="manager">Manager&lt;/SelectItem>
+                  &lt;/SelectContent>
+                &lt;/Select>
+              &lt;/div>
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="wage">Wage&lt;/Label>
+                &lt;Input
+                  id="wage"
+                  type="number"
+                  value={editingEmployee.wage}
+                  onChange={(e) => setEditingEmployee({ ...editingEmployee, wage: parseFloat(e.target.value) })}
+                />
+              &lt;/div>
+              {editingEmployee.role === 'manager' ? (
+                &lt;div className="space-y-2">
+                  &lt;Label htmlFor="email">Email&lt;/Label>
+                  &lt;Input
+                    id="email"
+                    type="email"
+                    value={editingEmployee.email || ''}
+                    onChange={(e) => setEditingEmployee({ ...editingEmployee, email: e.target.value })}
+                  />
+                &lt;/div>
+              ) : (
+                &lt;div className="space-y-2">
+                  &lt;Label htmlFor="password">Password&lt;/Label>
+                  &lt;Input
+                    id="password"
+                    type="password"
+                    value={editingEmployee.password || ''}
+                    onChange={(e) => setEditingEmployee({ ...editingEmployee, password: e.target.value })}
+                  />
+                &lt;/div>
+              )}
+              {editingEmployee.id !== 0 &amp;&amp; (
+              &lt;div className="space-y-2">
+                &lt;Label htmlFor="active" className="mr-2">Active&lt;/Label>
+                &lt;Checkbox
+                  id="active"
+                  checked={editingEmployee.active}
+                  onCheckedChange={(checked) => setEditingEmployee({ ...editingEmployee, active: checked as boolean })}
+                />
+              &lt;/div>
+              )}
+              &lt;DialogFooter>
+                &lt;Button onClick={editingEmployee.id ? handleUpdateEmployee : handleAddEmployee} className="bg-green-500 hover:bg-green-600">
+                  {editingEmployee.id ? 'Update Employee' : 'Add Employee'}
+                &lt;/Button>
+                {editingEmployee.id !== 0 &amp;&amp; (
+                  &lt;AlertDialog>
+                    &lt;AlertDialogTrigger asChild>
+                      &lt;Button variant="destructive">Delete Employee&lt;/Button>
+                    &lt;/AlertDialogTrigger>
+                    &lt;AlertDialogContent>
+                      &lt;AlertDialogHeader>
+                        &lt;AlertDialogTitle>Are you sure?&lt;/AlertDialogTitle>
+                        &lt;AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the employee.
+                        &lt;/AlertDialogDescription>
+                      &lt;/AlertDialogHeader>
+                      &lt;AlertDialogFooter>
+                        &lt;AlertDialogCancel>Cancel&lt;/AlertDialogCancel>
+                        &lt;AlertDialogAction onClick={handleDeleteEmployee}>Delete&lt;/AlertDialogAction>
+                      &lt;/AlertDialogFooter>
+                    &lt;/AlertDialogContent>
+                  &lt;/AlertDialog>
+                )}
+              &lt;/DialogFooter>
+            &lt;/div>
+          )}
+        &lt;/DialogContent>
+      &lt;/Dialog>
+      &lt;Table>
+        &lt;TableHeader>
+          &lt;TableRow>
+            &lt;TableHead>ID&lt;/TableHead>
+            &lt;TableHead>Name&lt;/TableHead>
+            &lt;TableHead>Role&lt;/TableHead>
+            &lt;TableHead>Wage&lt;/TableHead>
+            &lt;TableHead>Active&lt;/TableHead>
+            &lt;TableHead>Actions&lt;/TableHead>
+          &lt;/TableRow>
+        &lt;/TableHeader>
+        &lt;TableBody>
+          {employees.map((employee) => (
+            &lt;TableRow key={employee.id}>
+              &lt;TableCell>{employee.id}&lt;/TableCell>
+              &lt;TableCell>{employee.name}&lt;/TableCell>
+              &lt;TableCell>{employee.role}&lt;/TableCell>
+              &lt;TableCell>${Number(employee.wage).toFixed(2)}&lt;/TableCell>
+              &lt;TableCell>{employee.active ? 'Yes' : 'No'}&lt;/TableCell>
+              &lt;TableCell>
+                &lt;Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingEmployee(employee)}
+                >
+                  Edit
+                &lt;/Button>
+              &lt;/TableCell>
+            &lt;/TableRow>
+          ))}
+        &lt;/TableBody>
+      &lt;/Table>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

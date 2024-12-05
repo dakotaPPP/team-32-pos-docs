@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: cashier-gui.tsx</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: cashier-gui.tsx</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use client'
+
+import { useState, useEffect } from 'react'
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Loader, Trash2, AlertCircle } from 'lucide-react'
+import { CashierLogoutButton } from "@/components/ui/cashier-logout-button"
+
+/**
+ * @typedef {object} MenuItem
+ * @property {number} id - The ID of the menu item.
+ * @property {string} name - The name of the menu item.
+ * @property {string} price - The price of the menu item.
+ * @property {string} category - The category of the menu item.
+ */
+interface MenuItem {
+  id: number
+  name: string
+  price: string
+  category: string
+}
+
+/**
+ * @typedef {object} MenuData
+ * @property {MenuItem[]} menu_items - The list of menu items.
+ */
+interface MenuData {
+  menu_items: MenuItem[]
+}
+
+/**
+ * @typedef {object} OrderItem
+ * @property {number} id - The ID of the order item.
+ * @property {number} size - The size of the order item.
+ * @property {number} side_0 - The ID of the first side item.
+ * @property {number} side_1 - The ID of the second side item.
+ * @property {number} entree_0 - The ID of the first entree item.
+ * @property {number} entree_1 - The ID of the second entree item.
+ * @property {number} entree_2 - The ID of the third entree item.
+ * @property {number} price - The price of the order item.
+ * @property {string} category - The category of the order item.
+ * @property {string} name - The name of the order item.
+*/
+interface OrderItem {
+  id: number
+  size: number
+  side_0: number
+  side_1: number
+  entree_0: number
+  entree_1: number
+  entree_2: number
+  price: number
+  category: string
+  name: string
+}
+
+/**
+ * @typedef {object} CashierGuiProps
+ * @property {string} employeeId - The ID of the cashier employee.
+ */
+interface CashierGuiProps {
+  employeeId: string
+}
+
+/**
+ * @typedef {object} SizeConfig
+ * @property {string} name - The name of the size option.
+ * @property {number} entrees - The number of entrees for the size option.
+ * @property {number} sides - The number of sides for the size option.
+ */
+const sizeConfig = {
+  23: { name: 'Bowl', entrees: 1, sides: 1 },
+  24: { name: 'Plate', entrees: 2, sides: 1 },
+  25: { name: 'Bigger Plate', entrees: 3, sides: 1 },
+  26: { name: 'Panda Cub Meal', entrees: 1, sides: 1 },
+  27: { name: 'Family Meal', entrees: 3, sides: 2 },
+  28: { name: 'Small A La Carte', entrees: 1, sides: 1, allowEitherOr: true },
+  29: { name: 'Medium A La Carte', entrees: 1, sides: 1, allowEitherOr: true },
+  30: { name: 'Large A La Carte', entrees: 1, sides: 1, allowEitherOr: true },
+}
+
+const TAX_RATE = 0.0825 // 8.25% tax rate
+
+/**
+ * The main component for the cashier view. Displays the order summary,
+ * menu options, and a dialog for selecting entrees and sides.
+ * 
+ * @param {CashierGuiProps} props - The component props.
+ * @returns {JSX.Element} The cashier view component.
+ */
+export function CashierGui({ employeeId }: CashierGuiProps) {
+  const [orderItems, setOrderItems] = useState&lt;OrderItem[]>([])
+  const [menuData, setMenuData] = useState&lt;MenuData>({ menu_items: [] })
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [currentOrder, setCurrentOrder] = useState&lt;OrderItem | null>(null)
+  const [alert, setAlert] = useState&lt;{ show: boolean; message: string }>({ show: false, message: '' })
+
+  useEffect(() => {
+  /**
+   * Fetches the menu data from the API.
+   * 
+   * @async
+   * @function
+   * @name fetchMenuData
+   * @returns {Promise&lt;void>}
+   * @throws Will log an error message if the fetch fails.
+   */
+    const fetchMenuData = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/menu-items-cashier`)
+        if (!response.ok) {
+          throw new Error('Failed to fetch menu data')
+        }
+        const data = await response.json()
+        setMenuData(data)
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    fetchMenuData()
+  }, [])
+
+  /**
+   * Sets the current order item to the meal option with the given size ID.
+   * @param {number} sizeId The ID of the meal option.
+   * @param {number} price The price of the meal option.
+   */
+  const handleSizeClick = (sizeId: number, price: number) => {
+    setCurrentOrder({
+      id: sizeId,
+      size: sizeId,
+      side_0: -1,
+      side_1: -1,
+      entree_0: -1,
+      entree_1: -1,
+      entree_2: -1,
+      price: price,
+      category: 'meal_options',
+      name: sizeConfig[sizeId as keyof typeof sizeConfig].name,
+    })
+    setIsDialogOpen(true)
+  }
+
+  /**
+   * Handles the selection of a side or entree item in the dialog.
+   * Updates the current order with the selected item, and resets the other category
+   * if the meal option is an a la carte.
+   * @param {string} category The category of the item, either 'side' or 'entree'.
+   * @param {number} index The index of the item in the category.
+   * @param {number} itemId The ID of the item.
+   */
+  const handleItemSelection = (category: 'side' | 'entree', index: number, itemId: number) => {
+    if (currentOrder) {
+      const isALaCarte = [28, 29, 30].includes(currentOrder.size);
+      const updatedOrder = { ...currentOrder, [`${category}_${index}`]: itemId };
+      
+      if (isALaCarte) {
+        // For a la carte, reset the other category when one is selected
+        if (category === 'entree') {
+          updatedOrder.side_0 = -1;
+        } else {
+          updatedOrder.entree_0 = -1;
+        }
+      }
+      
+      setCurrentOrder(updatedOrder);
+    }
+  }
+
+/**
+ * Confirms the current order by adding it to the list of order items.
+ * Resets the current order and closes the dialog if an order is present.
+ */
+  const handleConfirmOrder = () => {
+    if (currentOrder) {
+      setOrderItems(prev => [...prev, currentOrder])
+      setCurrentOrder(null)
+      setIsDialogOpen(false)
+    }
+  }
+
+  /**
+   * Adds a new item to the order. Creates a new OrderItem based on the given MenuItem,
+   * and adds it to the list of order items.
+   * @param {MenuItem} item The item to add to the order.
+   */
+  const handleAddItem = (item: MenuItem) => {
+    const newItem: OrderItem = {
+      id: item.id,
+      size: item.id,
+      side_0: -1,
+      side_1: -1,
+      entree_0: -1,
+      entree_1: -1,
+      entree_2: -1,
+      price: parseFloat(item.price),
+      category: item.category,
+      name: item.name,
+    }
+    setOrderItems(prev => [...prev, newItem])
+  }
+
+  /**
+   * Deletes an item from the order by its index.
+   * @param {number} index The index of the item to delete.
+   */
+  const deleteItem = (index: number) => {
+    setOrderItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  /**
+   * Resets the order by clearing all items.
+   */
+  const clearAll = () => {
+    setOrderItems([])
+  }
+
+/**
+ * Handles the checkout process for the current order.
+ * 
+ * Filters the current order items into mains, drinks, and more choices categories.
+ * Calculates the subtotal, tax, and total amount for the order. Sends a POST request
+ * to the order API endpoint with the order details, including the employee ID, categorized
+ * order items, tax, and total amount.
+ * 
+ * On successful response, displays a success alert message with the order ID and clears
+ * the order items. Logs an error message if the checkout fails or if there is an error
+ * during the process.
+ * 
+ * @async
+ * @function
+ * @throws Will log an error message if the fetch request fails.
+ */
+  const handleCheckout = async () => {
+    if (orderItems.length === 0) return
+
+    const mains = orderItems.filter(item => item.category === 'meal_options')
+    const drinks = orderItems.filter(item => item.category === 'drinks')
+    const moreChoices = orderItems.filter(item => item.category === 'more_choices')
+
+    const subtotal = orderItems.reduce((sum, item) => sum + item.price, 0)
+    const tax = subtotal * TAX_RATE
+    const total = subtotal + tax
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employee_id: employeeId,
+          mains: mains.map(item =>({
+            id: item.id,
+            side_0: item.side_0,
+            side_1: item.side_1,
+            entree_0: item.entree_0,
+            entree_1: item.entree_1,
+            entree_2: item.entree_2
+          })),
+          drinks: drinks.map(item => ({ id: item.id })),
+          more_choices: moreChoices.map(item => ({ id: item.id })),
+          tax: tax.toFixed(2),
+          total: total.toFixed(2),
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAlert({ show: true, message: `Checkout successful, order ${data['order-id']} has been placed.` })
+        setOrderItems([]) // Clear the order after successful checkout
+      } else {
+        console.error('Checkout failed')
+      }
+    } catch (error) {
+      console.error('Error during checkout:', error)
+    }
+  }
+
+/**
+ * Retrieves the name of a menu item based on its ID.
+ * 
+ * Searches through the `menuData.menu_items` array to find an item
+ * with a matching ID. If an item is found, its name is returned.
+ * If no item is found, 'Not selected' is returned.
+ * 
+ * @param {number} id - The ID of the menu item to find.
+ * @returns {string} The name of the menu item, or 'Not selected' if not found.
+ */
+  const getItemName = (id: number) => {
+    const item = menuData.menu_items.find(item => item.id === id)
+    return item ? item.name : 'Not selected'
+  }
+
+  /**
+   * Retrieves a subtext string describing the contents of a meal option item.
+   * 
+   * If the item is a meal option, it will return a string listing the
+   * entrees and sides selected, separated by commas. If the item is not
+   * a meal option, it will return an empty string.
+   * 
+   * @param {OrderItem} order - The order item to generate a subtext for.
+   * @returns {string} A subtext string describing the contents of the meal option.
+   */
+  const getOrderSubtext = (order: OrderItem) => {
+    if (order.category === 'meal_options') {
+      const config = sizeConfig[order.size as keyof typeof sizeConfig]
+      let subtext = ''
+      for (let i = 0; i &lt; config.entrees; i++) {
+        subtext += `${getItemName(order[`entree_${i}` as keyof OrderItem] as number)}, `
+      }
+      for (let i = 0; i &lt; config.sides; i++) {
+        subtext += `${getItemName(order[`side_${i}` as keyof OrderItem] as number)}, `
+      }
+      return subtext.slice(0, -2) // Remove last comma and space
+    }
+    return '' // Return empty string for non-meal items
+  }
+
+  const subtotal = orderItems.reduce((sum, item) => sum + item.price, 0)
+  const tax = subtotal * TAX_RATE
+  const total = subtotal + tax
+
+  useEffect(() => {
+    if (alert.show) {
+      const timer = setTimeout(() => {
+        setAlert({ show: false, message: '' })
+      }, 10000)
+      return () => clearTimeout(timer)
+    }
+  }, [alert.show])
+
+  if (!menuData.menu_items.length) {
+    return (
+      &lt;div className="flex h-screen items-center justify-center">
+        &lt;Loader className="h-12 w-12 animate-spin text-primary" />
+      &lt;/div>
+    )
+  }
+
+  const sizeOptions = menuData.menu_items.filter(item => item.category === 'meal_options')
+  const entrees = menuData.menu_items.filter(item => item.category === 'entrees')
+  const sides = menuData.menu_items.filter(item => item.category === 'sides')
+  const drinks = menuData.menu_items.filter(item => item.category === 'drinks')
+  const moreChoices = menuData.menu_items.filter(item => item.category === 'more_choices')
+
+  return (
+    &lt;div className="min-h-screen bg-background">
+      &lt;div className="flex justify-between items-center p-4 bg-white border-b">
+        &lt;h1 className="text-2xl font-bold">Cashier View&lt;/h1>
+        &lt;CashierLogoutButton />
+      &lt;/div>
+      {alert.show &amp;&amp; (
+        &lt;div className="fixed top-4 right-4 z-50 flex items-center space-x-4 rounded-md bg-green-500 px-6 py-4 text-white shadow-lg animate-in fade-in slide-in-from-top-5 duration-300">
+          &lt;AlertCircle className="h-6 w-6" />
+          &lt;span>{alert.message}&lt;/span>
+        &lt;/div>
+      )}
+      &lt;div className="flex flex-1 overflow-hidden">
+        {/* Left Pane - Order Summary */}
+        &lt;div className="flex w-[400px] flex-col border-r">
+          &lt;ScrollArea className="flex-1">
+            &lt;Table>
+              &lt;TableHeader>
+                &lt;TableRow>
+                  &lt;TableHead>Item&lt;/TableHead>
+                  &lt;TableHead className="w-[80px] text-right">Price&lt;/TableHead>
+                  &lt;TableHead className="w-[50px]">&lt;/TableHead>
+                &lt;/TableRow>
+              &lt;/TableHeader>
+              &lt;TableBody>
+                {orderItems.map((item, index) => (
+                  &lt;TableRow key={index}>
+                    &lt;TableCell>
+                      &lt;div>{item.name}&lt;/div>
+                      &lt;div className="text-sm text-gray-500">{getOrderSubtext(item)}&lt;/div>
+                    &lt;/TableCell>
+                    &lt;TableCell className="text-right">${item.price.toFixed(2)}&lt;/TableCell>
+                    &lt;TableCell>
+                      &lt;Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteItem(index)}
+                      >
+                        &lt;Trash2 className="h-4 w-4" />
+                      &lt;/Button>
+                    &lt;/TableCell>
+                  &lt;/TableRow>
+                ))}
+              &lt;/TableBody>
+            &lt;/Table>
+          &lt;/ScrollArea>
+          
+          &lt;div className="border-t p-4">
+            &lt;div className="space-y-2 mb-4">
+              &lt;div className="flex justify-between items-center">
+                &lt;span>Subtotal:&lt;/span>
+                &lt;span>${subtotal.toFixed(2)}&lt;/span>
+              &lt;/div>
+              &lt;div className="flex justify-between items-center">
+                &lt;span>Tax:&lt;/span>
+                &lt;span>${tax.toFixed(2)}&lt;/span>
+              &lt;/div>
+              &lt;div className="flex justify-between items-center font-bold">
+                &lt;span>Total:&lt;/span>
+                &lt;span>${total.toFixed(2)}&lt;/span>
+              &lt;/div>
+            &lt;/div>
+            &lt;div className="grid grid-cols-2 gap-2">
+              &lt;Button className="w-full bg-green-500 hover:bg-green-600" onClick={handleCheckout}>
+                Checkout
+              &lt;/Button>
+              &lt;Button className="w-full" onClick={clearAll}>
+                Clear All
+              &lt;/Button>
+            &lt;/div>
+          &lt;/div>
+        &lt;/div>
+
+        {/* Right Pane - Menu Options */}
+        &lt;div className="flex-1 overflow-hidden">
+          &lt;ScrollArea className="h-full">
+            &lt;div className="p-4">
+              &lt;h2 className="text-lg font-semibold mb-2">Meal Options&lt;/h2>
+              &lt;div className="grid grid-cols-2 gap-4 mb-4">
+                {sizeOptions.map((item) => (
+                  &lt;Button
+                    key={item.id}
+                    variant="outline"
+                    className="h-24 whitespace-normal flex flex-col items-start p-2"
+                    onClick={() => handleSizeClick(item.id, parseFloat(item.price))}
+                  >
+                    &lt;span className="font-bold">{item.name}&lt;/span>
+                    &lt;span className="text-sm text-gray-500">
+                      {sizeConfig[item.id as keyof typeof sizeConfig].entrees} entree(s), 
+                      {sizeConfig[item.id as keyof typeof sizeConfig].sides} side(s)
+                    &lt;/span>
+                    &lt;span className="text-sm">${item.price}&lt;/span>
+                  &lt;/Button>
+                ))}
+              &lt;/div>
+              &lt;h2 className="text-lg font-semibold mb-2">Drinks&lt;/h2>
+              &lt;div className="grid grid-cols-3 gap-4 mb-4">
+                {drinks.map((item) => (
+                  &lt;Button
+                    key={item.id}
+                    variant="outline"
+                    className="h-20 whitespace-normal flex flex-col items-start p-2"
+                    onClick={() => handleAddItem(item)}
+                  >
+                    &lt;span className="font-bold">{item.name}&lt;/span>
+                    &lt;span className="text-sm">${item.price}&lt;/span>
+                  &lt;/Button>
+                ))}
+              &lt;/div>
+              &lt;h2 className="text-lg font-semibold mb-2">More Choices&lt;/h2>
+              &lt;div className="grid grid-cols-3 gap-4">
+                {moreChoices.map((item) => (
+                  &lt;Button
+                    key={item.id}
+                    variant="outline"
+                    className="h-20 whitespace-normal flex flex-col items-start p-2"
+                    onClick={() => handleAddItem(item)}
+                  >
+                    &lt;span className="font-bold">{item.name}&lt;/span>
+                    &lt;span className="text-sm">${item.price}&lt;/span>
+                  &lt;/Button>
+                ))}
+              &lt;/div>
+            &lt;/div>
+          &lt;/ScrollArea>
+        &lt;/div>
+      &lt;/div>
+
+      {/* Dialog for selecting entrees and sides */}
+      &lt;Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        &lt;DialogContent>
+          &lt;DialogHeader>
+            &lt;DialogTitle>Select Items&lt;/DialogTitle>
+          &lt;/DialogHeader>
+          {currentOrder &amp;&amp; (
+            &lt;div className="grid gap-4">
+              &lt;div>
+                &lt;h3 className="mb-2 font-semibold">Entrees&lt;/h3>
+                &lt;div className="grid grid-cols-2 gap-2">
+                  {Array.from({ length: sizeConfig[currentOrder.size as keyof typeof sizeConfig].entrees }).map((_, index) => (
+                    &lt;select
+                      key={`entree_${index}`}
+                      onChange={(e) => handleItemSelection('entree', index, parseInt(e.target.value))}
+                      className="w-full p-2 border rounded"
+                      disabled={[28, 29, 30].includes(currentOrder.size) &amp;&amp; currentOrder.side_0 !== -1}
+                    >
+                      &lt;option value="-1">Select Entree&lt;/option>
+                      {entrees.map((entree) => (
+                        &lt;option key={entree.id} value={entree.id}>{entree.name}&lt;/option>
+                      ))}
+                    &lt;/select>
+                  ))}
+                &lt;/div>
+              &lt;/div>
+              &lt;div>
+                &lt;h3 className="mb-2 font-semibold">Sides&lt;/h3>
+                &lt;div className="grid grid-cols-2 gap-2">
+                  {Array.from({ length: sizeConfig[currentOrder.size as keyof typeof sizeConfig].sides }).map((_, index) => (
+                    &lt;select
+                      key={`side_${index}`}
+                      onChange={(e) => handleItemSelection('side', index, parseInt(e.target.value))}
+                      className="w-full p-2 border rounded"
+                      disabled={[28, 29, 30].includes(currentOrder.size) &amp;&amp; currentOrder.entree_0 !== -1}
+                    >
+                      &lt;option value="-1">Select Side&lt;/option>
+                      {sides.map((side) => (
+                        &lt;option key={side.id} value={side.id}>{side.name}&lt;/option>
+                      ))}
+                    &lt;/select>
+                  ))}
+                &lt;/div>
+              &lt;/div>
+            &lt;/div>
+          )}
+          &lt;DialogFooter>
+            &lt;Button onClick={handleConfirmOrder}>Confirm&lt;/Button>
+          &lt;/DialogFooter>
+        &lt;/DialogContent>
+      &lt;/Dialog>
+    &lt;/div>
+  )
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#CashierGui">CashierGui</a></li><li><a href="global.html#CashierLoginPage">CashierLoginPage</a></li><li><a href="global.html#Employees">Employees</a></li><li><a href="global.html#Ingredients">Ingredients</a></li><li><a href="global.html#KioskView">KioskView</a></li><li><a href="global.html#KitchenDisplay">KitchenDisplay</a></li><li><a href="global.html#LoginForm">LoginForm</a></li><li><a href="global.html#MenuItems">MenuItems</a></li><li><a href="global.html#OrderCard">OrderCard</a></li><li><a href="global.html#PandaExpressMenu">PandaExpressMenu</a></li><li><a href="global.html#Reports">Reports</a></li><li><a href="global.html#SelectLanguage">SelectLanguage</a></li><li><a href="global.html#SelectPage">SelectPage</a></li><li><a href="global.html#SessionProvider">SessionProvider</a></li><li><a href="global.html#Sidebar">Sidebar</a></li><li><a href="global.html#StatusIcon">StatusIcon</a></li><li><a href="global.html#confirmCancel">confirmCancel</a></li><li><a href="global.html#convertToBase64">convertToBase64</a></li><li><a href="global.html#fetchData">fetchData</a></li><li><a href="global.html#fetchEmployees">fetchEmployees</a></li><li><a href="global.html#fetchIngredients">fetchIngredients</a></li><li><a href="global.html#fetchMenuData">fetchMenuData</a></li><li><a href="global.html#fetchMenuItems">fetchMenuItems</a></li><li><a href="global.html#fetchReportWithDateRange">fetchReportWithDateRange</a></li><li><a href="global.html#fetchXReport">fetchXReport</a></li><li><a href="global.html#fetchZReport">fetchZReport</a></li><li><a href="global.html#handleAddIngredient">handleAddIngredient</a></li><li><a href="global.html#handleAddMenuItem">handleAddMenuItem</a></li><li><a href="global.html#handleAllergenChange">handleAllergenChange</a></li><li><a href="global.html#handleBackToMenu">handleBackToMenu</a></li><li><a href="global.html#handleCancel">handleCancel</a></li><li><a href="global.html#handleCancelOrder">handleCancelOrder</a></li><li><a href="global.html#handleComplete">handleComplete</a></li><li><a href="global.html#handleDeleteMenuItem">handleDeleteMenuItem</a></li><li><a href="global.html#handleImageUpload">handleImageUpload</a></li><li><a href="global.html#handleSort">handleSort</a></li><li><a href="global.html#handleStatusChange">handleStatusChange</a></li><li><a href="global.html#handleUpdateMenuItem">handleUpdateMenuItem</a></li><li><a href="global.html#renderChart">renderChart</a></li><li><a href="global.html#renderEmployeeSalesReport">renderEmployeeSalesReport</a></li><li><a href="global.html#renderSalesReport">renderSalesReport</a></li><li><a href="global.html#renderSalesTable">renderSalesTable</a></li><li><a href="global.html#statusColors">statusColors</a></li><li><a href="global.html#toggleHighContrast">toggleHighContrast</a></li><li><a href="global.html#translateTexts">translateTexts</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Dec 04 2024 17:58:07 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
